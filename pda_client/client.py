@@ -9,8 +9,6 @@ from requests import Response
 
 from pda_client.models import PdaRecord
 
-CONTENT_TYPE = "application/json"
-
 
 class PdaException(Exception):
     pass
@@ -79,7 +77,7 @@ class PdaClient:
         response = self._session.get(
             url=f"https://{username}.hubat.net/users/access_token",
             headers={
-                "Accept": CONTENT_TYPE,
+                "Accept": "application/json",
                 "username": username,
                 "password": password})
         auth_token = self._check_json(response, PdaAuthException)["accessToken"]
@@ -126,4 +124,6 @@ class PdaClient:
         return parse.urljoin(base, endpoint)
 
     def _auth_header(self) -> dict:
-        return {"Content-Type": CONTENT_TYPE, "x-auth-token": self._auth_token}
+        return {
+            "Content-Type": "application/json",
+            "x-auth-token": self._auth_token}
