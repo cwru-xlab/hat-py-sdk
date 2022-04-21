@@ -8,31 +8,8 @@ import requests
 from keyring.credentials import Credential
 from requests import HTTPError, JSONDecodeError, Response
 
+from pda_client.exceptions import *
 from pda_client.models import PdaRecord
-
-
-class PdaException(Exception):
-    pass
-
-
-class PdaCredentialException(PdaException):
-    pass
-
-
-class PdaAuthException(PdaException):
-    pass
-
-
-class PdaPostException(PdaException):
-    pass
-
-
-class PdaPutException(PdaException):
-    pass
-
-
-class PdaGetException(PdaException):
-    pass
 
 
 class PdaClient:
