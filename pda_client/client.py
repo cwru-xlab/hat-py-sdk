@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-import abc
-from typing import Any, Sequence, Type
+from typing import Any, Optional, Sequence, Type
 from urllib import parse
 
+import keyring
 import requests
+from keyring.credentials import Credential
 from requests import Response
 
 from pda_client.models import PdaRecord
 
 
 class PdaException(Exception):
+    pass
+
+
+class PdaCredentialException(PdaException):
     pass
 
 
@@ -30,50 +35,31 @@ class PdaGetException(PdaException):
     pass
 
 
-class PdaCredentials(abc.ABC):
-    __slots__ = ()
-
-    def __init__(self):
-        pass
-
-    @abc.abstractmethod
-    def username(self) -> str:
-        pass
-
-    @abc.abstractmethod
-    def password(self) -> str:
-        pass
-
-
-class StaticPdaCredentials(PdaCredentials):
-    __slots__ = ("_username", "_password")
-
-    def __init__(self, username: str, password: str):
-        super().__init__()
-        self._username = username
-        self._password = password
-
-    def username(self) -> str:
-        return self._username
-
-    def password(self) -> str:
-        return self._password
-
-
 class PdaClient:
-    __slots__ = ("credentials", "_auth_token", "_session")
+    __slots__ = ("_credential", "_auth_token", "_session")
 
-    def __init__(self, credentials: PdaCredentials):
-        self.credentials = credentials
+    def __init__(self, credential: Credential = None, username: str = None):
+        if credential is None:
+            self._credential = self._get_credential(username)
+        else:
+            self._credential = credential
         self._auth_token = None
         self._session = requests.session()
+
+    @staticmethod
+    def _get_credential(username: Optional[str]) -> Credential:
+        credential = keyring.get_credential("pda-client", username)
+        if credential is None:
+            raise PdaCredentialException(
+                f"Unable to obtain PDA client credential for user {username}")
+        return credential
 
     def close(self):
         self._session.close()
 
     def authenticate(self) -> None:
-        username = self.credentials.username()
-        password = self.credentials.password()
+        username = self._credential.username
+        password = self._credential.password
         response = self._session.get(
             url=f"https://{username}.hubat.net/users/access_token",
             headers={
@@ -119,7 +105,7 @@ class PdaClient:
         return response.json()
 
     def _format_url(self, endpoint: str = None) -> str:
-        username = self.credentials.username()
+        username = self._credential.username
         base = f"https://{username}.hubat.net/api/v2.6/data"
         return parse.urljoin(base, endpoint)
 
