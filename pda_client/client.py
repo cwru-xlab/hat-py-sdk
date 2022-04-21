@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Sequence, Type
+from typing import Sequence, Type
 from urllib import parse
 
 import keyring
 import requests
 from keyring.credentials import Credential
-from requests import Response
+from requests import HTTPError, JSONDecodeError, Response
 
 from pda_client.models import PdaRecord
 
@@ -39,20 +39,19 @@ class PdaClient:
     __slots__ = ("_credential", "_auth_token", "_session")
 
     def __init__(self, credential: Credential = None, username: str = None):
-        if credential is None:
-            self._credential = self._get_credential(username)
-        else:
-            self._credential = credential
-        self._auth_token = None
+        self._set_credential(credential, username)
         self._session = requests.session()
+        self._auth_token = None
+        self.authenticate()
 
-    @staticmethod
-    def _get_credential(username: Optional[str]) -> Credential:
-        credential = keyring.get_credential("pda-client", username)
+    def _set_credential(
+            self, credential: Credential | None, username: str | None) -> None:
         if credential is None:
-            raise PdaCredentialException(
-                f"Unable to obtain PDA client credential for user {username}")
-        return credential
+            credential = keyring.get_credential("pda-client", username)
+            if credential is None:
+                raise PdaCredentialException(
+                    f"Unable to obtain credential for user {username}")
+        self._credential = credential
 
     def close(self):
         self._session.close()
@@ -66,50 +65,58 @@ class PdaClient:
                 "Accept": "application/json",
                 "username": username,
                 "password": password})
-        auth_token = self._check_json(response, PdaAuthException)["accessToken"]
+        auth_token = _get_content(response, PdaAuthException)["accessToken"]
         self._auth_token = auth_token
 
     def get(self, endpoint: str) -> Sequence[PdaRecord]:
-        self._check_auth()
         response = self._session.get(
             url=self._format_url(endpoint), headers=self._auth_header())
-        response = self._check_json(response, PdaGetException)
-        return tuple(PdaRecord(**record) for record in response)
+        return _get_records(response, PdaGetException)
 
-    def post(self, data: Any, endpoint: str) -> Sequence[PdaRecord]:
-        self._check_auth()
-        response = self._session.post(
-            url=self._format_url(endpoint),
-            headers=self._auth_header(),
-            json=data)
-        response = self._check_json(response, PdaPostException)
-        return tuple(PdaRecord(**record) for record in response)
+    def post(self, *records: PdaRecord) -> Sequence[PdaRecord]:
+        posted = []
+        for record in records:
+            response = self._session.post(
+                url=self._format_url(record.endpoint),
+                headers=self._auth_header(),
+                json=record.data)
+            posted.extend(_get_records(response, PdaPostException))
+        return tuple(posted)
 
     def put(self, *records: PdaRecord) -> Sequence[PdaRecord]:
-        self._check_auth()
         response = self._session.put(
             url=self._format_url(),
             headers=self._auth_header(),
-            json=records)
-        response = self._check_json(response, PdaPutException)
-        return tuple(PdaRecord(**record) for record in response)
-
-    def _check_auth(self) -> None:
-        if self._auth_token is None:
-            self.authenticate()
-
-    @staticmethod
-    def _check_json(response: Response, exception: Type) -> dict | list:
-        if not response.ok:
-            raise exception(f"{response.status_code}: {response.reason}")
-        return response.json()
+            json=[record.dict() for record in records])
+        return _get_records(response, PdaPutException)
 
     def _format_url(self, endpoint: str = None) -> str:
-        username = self._credential.username
-        base = f"https://{username}.hubat.net/api/v2.6/data"
-        return parse.urljoin(base, endpoint)
+        url = f"https://{self._credential.username}.hubat.net/api/v2.6/data"
+        if endpoint is not None:
+            url = parse.urljoin(f"{url}/", endpoint)
+        return url
 
     def _auth_header(self) -> dict:
         return {
             "Content-Type": "application/json",
             "x-auth-token": self._auth_token}
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._credential.username})"
+
+
+def _get_records(response: Response, exception: Type) -> Sequence[PdaRecord]:
+    content = _get_content(response, exception)
+    if isinstance(content, Sequence):
+        records = tuple(PdaRecord(**record) for record in content)
+    else:
+        records = (PdaRecord(**content),)
+    return records
+
+
+def _get_content(response: Response, exception: Type) -> dict | list:
+    try:
+        response.raise_for_status()
+        return response.json()
+    except (HTTPError, JSONDecodeError) as error:
+        raise exception(error)
