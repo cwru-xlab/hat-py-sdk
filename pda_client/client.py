@@ -117,7 +117,7 @@ class PdaClient:
     @staticmethod
     def _check_json(response: Response, exception: Type) -> dict | list:
         if not response.ok:
-            raise exception(response.reason)
+            raise exception(f"{response.status_code}: {response.reason}")
         return response.json()
 
     def _format_url(self, endpoint: str = None) -> str:
