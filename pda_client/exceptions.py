@@ -20,3 +20,6 @@ class PdaPutException(PdaException):
 
 class PdaGetException(PdaException):
     pass
+
+class PdaDeleteException(PdaException):
+    pass

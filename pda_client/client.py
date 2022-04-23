@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools
+import itertools
 from typing import Sequence, Type
 from urllib import parse
 
@@ -47,31 +49,40 @@ class PdaClient:
 
     def get(self, endpoint: str) -> Sequence[PdaRecord]:
         response = self._session.get(
-            url=self._format_url(endpoint), headers=self._auth_header())
+            url=self._endpoint_url(endpoint), headers=self._auth_header())
         return _get_records(response, PdaGetException)
 
     def post(self, *records: PdaRecord) -> Sequence[PdaRecord]:
         posted = []
-        for record in records:
+        by_dest = functools.partial(lambda record: record.endpoint)
+        groups = itertools.groupby(sorted(records, key=by_dest), by_dest)
+        for endpoint, records in groups:
             response = self._session.post(
-                url=self._format_url(record.endpoint),
+                url=self._endpoint_url(endpoint),
                 headers=self._auth_header(),
-                json=record.data)
+                json=[record.dict() for record in records])
             posted.extend(_get_records(response, PdaPostException))
         return tuple(posted)
 
     def put(self, *records: PdaRecord) -> Sequence[PdaRecord]:
         response = self._session.put(
-            url=self._format_url(),
+            url=self._base_url(),
             headers=self._auth_header(),
             json=[record.dict() for record in records])
         return _get_records(response, PdaPutException)
 
-    def _format_url(self, endpoint: str = None) -> str:
-        url = f"https://{self._credential.username}.hubat.net/api/v2.6/data"
-        if endpoint is not None:
-            url = parse.urljoin(f"{url}/", endpoint)
-        return url
+    def delete(self, *records: PdaRecord) -> None:
+        response = self._session.delete(
+            url=self._base_url(),
+            headers=self._auth_header(),
+            params={"records": [record.record_id for record in records]})
+        _get_content(response, PdaDeleteException)
+
+    def _endpoint_url(self, endpoint: str) -> str:
+        return parse.urljoin(f"{self._base_url()}/", endpoint)
+
+    def _base_url(self) -> str:
+        return f"https://{self._credential.username}.hubat.net/api/v2.6/data"
 
     def _auth_header(self) -> dict:
         return {
