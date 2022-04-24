@@ -32,8 +32,9 @@ client = HatClient(
 
 ### Authentication
 
-A `HatClient` instance performs authentication during instantiation, so it can
-be used immediately. However, the client can be re-authenticated as well:
+A [`HatClient`](https://github.com/Blockcert-CWRU/hat-py-sdk/blob/main/hat/client.py)
+instance performs authentication during instantiation, so it can be used
+immediately. However, the client can be re-authenticated as well:
 
 ```python
 # Internally updates the client authentication token.
@@ -51,13 +52,13 @@ powerful data parsing and validation.
 from hat import Record
 
 # GET requests can use a Record object...
-records = client.get(Record(endpoint="/namespace/endpoint"), ...)
+records = client.get(Record(endpoint="namespace/endpoint"), ...)
 # ...or just specify the endpoints.
-records = client.get("/namespace/endpoint", ...)
+records = client.get("namespace/endpoint", ...)
 
 # Records are grouped by endpoint to support mixed endpoint POST/PUT requests.
-records = client.post(Record(endpoint="/namespace/endpoint", data={...}, ...))
-records = client.put(Record(endpoint="/namespace/endpoint", data={...}, ...))
+records = client.post(Record(endpoint="namespace/endpoint", data={...}, ...))
+records = client.put(Record(endpoint="namespace/endpoint", data={...}, ...))
 
 # Similar to GET requests, DELETE requests can specify a Record object...
 records = client.delete(Record(record_id="record_id"), ...)
