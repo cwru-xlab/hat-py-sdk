@@ -58,8 +58,8 @@ class HatClient:
     def get(self, *endpoints: str | Record) -> Sequence[Record]:
         got = []
         if isinstance(endpoints[0], Record):
-            endpoints = {r.record_id for r in endpoints}
-        for endpoint in endpoints:
+            endpoints = (r.record_id for r in endpoints)
+        for endpoint in set(endpoints):
             response = self._session.get(
                 url=self._format_url(endpoint), headers=self._auth_header())
             got.extend(_get_records(response, HatGetException))
