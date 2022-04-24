@@ -60,7 +60,7 @@ class HatClient:
     def get(self, *endpoints: str | Record) -> Records:
         got = []
         if isinstance(endpoints[0], Record):
-            endpoints = (r.record_id for r in endpoints)
+            endpoints = (r.endpoint for r in endpoints)
         for endpoint in set(endpoints):
             response = self._session.get(
                 url=self._format_url(endpoint), headers=self._auth_header())
