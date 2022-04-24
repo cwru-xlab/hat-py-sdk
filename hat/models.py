@@ -1,11 +1,11 @@
 import humps
-from pydantic import BaseModel
+import pydantic
 
 
-class Record(BaseModel):
-    endpoint: str
-    data: dict
+class Record(pydantic.BaseModel):
+    endpoint: str = None
     record_id: str = None
+    data: dict = pydantic.Field(default_factory=dict)
 
     class Config:
         alias_generator = humps.camelize
