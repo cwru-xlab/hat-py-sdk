@@ -53,7 +53,7 @@ class HatClient:
             response = self._session.get(
                 url=self._endpoint_url(endpoint), headers=self._auth_header())
             got.extend(_get_records(response, HatGetException))
-        return got
+        return tuple(got)
 
     def post(self, *records: Record) -> Sequence[Record]:
         posted = []
