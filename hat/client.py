@@ -55,7 +55,7 @@ class HatClient:
     def get(self, *endpoints: Record) -> Sequence[Record]:
         pass
 
-    def get(self, *endpoints) -> Sequence[Record]:
+    def get(self, *endpoints: str | Record) -> Sequence[Record]:
         got = []
         if isinstance(endpoints[0], Record):
             endpoints = {r.record_id for r in endpoints}
@@ -90,7 +90,7 @@ class HatClient:
     def delete(self, *records: str) -> None:
         pass
 
-    def delete(self, *records) -> None:
+    def delete(self, *records: str | Record) -> None:
         if isinstance(records[0], Record):
             records = [r.record_id for r in records]
         response = self._session.delete(
