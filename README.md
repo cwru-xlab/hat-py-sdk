@@ -61,7 +61,7 @@ records = client.post(Record(endpoint="namespace/endpoint", data={...}, ...))
 records = client.put(Record(endpoint="namespace/endpoint", data={...}, ...))
 
 # Similar to GET requests, DELETE requests can specify a Record object...
-records = client.delete(Record(record_id="record_id"), ...)
+client.delete(Record(record_id="record_id"), ...)
 # ...or just the record IDs.
-records = client.delete("record_id", ...)
+client.delete("record_id", ...)
 ```
