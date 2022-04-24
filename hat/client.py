@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 import itertools
-from typing import Iterable, Sequence, Type, overload
+from typing import Any, Iterable, Sequence, Tuple, Type, overload
 from urllib import parse
 
 import keyring
@@ -12,6 +12,8 @@ from requests import HTTPError, JSONDecodeError, Response
 
 from hat.exceptions import *
 from hat.models import Record
+
+Records = Sequence[Record]
 
 
 class HatClient:
@@ -48,14 +50,14 @@ class HatClient:
         self._auth_token = auth_token
 
     @overload
-    def get(self, *endpoints: str) -> Sequence[Record]:
+    def get(self, *endpoints: str) -> Records:
         pass
 
     @overload
-    def get(self, *endpoints: Record) -> Sequence[Record]:
+    def get(self, *endpoints: Record) -> Records:
         pass
 
-    def get(self, *endpoints: str | Record) -> Sequence[Record]:
+    def get(self, *endpoints: str | Record) -> Records:
         got = []
         if isinstance(endpoints[0], Record):
             endpoints = (r.record_id for r in endpoints)
@@ -65,7 +67,7 @@ class HatClient:
             got.extend(_get_records(response, HatGetException))
         return tuple(got)
 
-    def post(self, *records: Record) -> Sequence[Record]:
+    def post(self, *records: Record) -> Records:
         posted = []
         for endpoint, records in _group_by_endpoint(*records):
             response = self._session.post(
@@ -75,7 +77,7 @@ class HatClient:
             posted.extend(_get_records(response, HatPostException))
         return tuple(posted)
 
-    def put(self, *records: Record) -> Sequence[Record]:
+    def put(self, *records: Record) -> Records:
         response = self._session.put(
             url=self._format_url(),
             headers=self._auth_header(),
@@ -114,12 +116,12 @@ class HatClient:
         return f"{self.__class__.__name__}({self._credential.username})"
 
 
-def _group_by_endpoint(*records: Record) -> Iterable[Sequence[Record]]:
+def _group_by_endpoint(*records: Record) -> Iterable[Tuple[Any, Records]]:
     by_endpoint = functools.partial(lambda record: record.endpoint)
     return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
 
 
-def _get_records(response: Response, exception: Type) -> Sequence[Record]:
+def _get_records(response: Response, exception: Type) -> Records:
     content = _get_content(response, exception)
     if isinstance(content, Sequence):
         records = tuple(Record(**record) for record in content)
