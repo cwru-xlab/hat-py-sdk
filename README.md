@@ -56,9 +56,10 @@ records = client.get(Record(endpoint="namespace/endpoint"), ...)
 # ...or just specify the endpoints.
 records = client.get("namespace/endpoint", ...)
 
-# Records are grouped by endpoint to support mixed endpoint POST/PUT requests.
-records = client.post(Record(endpoint="namespace/endpoint", data={...}, ...))
-records = client.put(Record(endpoint="namespace/endpoint", data={...}, ...))
+# Records are grouped by endpoint for efficient mixed-endpoint POST requests. 
+records = client.post(Record(endpoint="namespace/endpoint", data={...}), ...)
+
+records = client.put(Record(endpoint="namespace/endpoint", data={...}), ...)
 
 # Similar to GET requests, DELETE requests can specify a Record object...
 client.delete(Record(record_id="record_id"), ...)
