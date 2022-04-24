@@ -19,9 +19,13 @@ Records = Sequence[Record]
 class HatClient:
     __slots__ = ("_credential", "_auth_token", "_session")
 
-    def __init__(self, credential: Credential = None, username: str = None):
+    def __init__(
+            self,
+            credential: Credential = None,
+            username: str = None,
+            session: requests.Session = None):
         self._set_credential(credential, username)
-        self._session = requests.session()
+        self._session = session or requests.session()
         self._auth_token = None
         self.authenticate()
 
