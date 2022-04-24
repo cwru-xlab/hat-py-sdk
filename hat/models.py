@@ -2,7 +2,7 @@ import humps
 from pydantic import BaseModel
 
 
-class PdaRecord(BaseModel):
+class Record(BaseModel):
     endpoint: str
     data: dict
     record_id: str = None

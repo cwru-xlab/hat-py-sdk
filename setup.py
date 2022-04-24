@@ -1,10 +1,10 @@
 import setuptools
 
 setuptools.setup(
-    name='pda-client',
+    name='hat-py-sdk',
     version='0.1.0',
     packages=setuptools.find_packages(),
-    url='https://github.com/Blockcert-CWRU/pda-client',
+    url='https://github.com/Blockcert-CWRU/hat-py-sdk',
     license='',
     author='Ryan Tatton',
     author_email='rdt17@protonmail.com',
