@@ -1,3 +1,4 @@
+# noinspection PyPackageRequirements
 import humps
 import pydantic
 
