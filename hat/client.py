@@ -71,7 +71,7 @@ class HatClient:
             response = self._session.post(
                 url=self._format_url(endpoint),
                 headers=self._auth_header(),
-                json=[r.dict() for r in records])
+                json=[r.data for r in records])
             posted.extend(_get_records(response, HatPostException))
         return tuple(posted)
 
