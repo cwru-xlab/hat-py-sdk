@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 import itertools
-from typing import Sequence, Type
+from typing import Iterable, Sequence, Type
 from urllib import parse
 
 import keyring
@@ -47,16 +47,17 @@ class HatClient:
         auth_token = _get_content(response, HatAuthException)["accessToken"]
         self._auth_token = auth_token
 
-    def get(self, endpoint: str) -> Sequence[Record]:
-        response = self._session.get(
-            url=self._endpoint_url(endpoint), headers=self._auth_header())
-        return _get_records(response, HatGetException)
+    def get(self, *records: Record) -> Sequence[Record]:
+        got = []
+        for endpoint, _ in _group_by_endpoint(*records):
+            response = self._session.get(
+                url=self._endpoint_url(endpoint), headers=self._auth_header())
+            got.extend(_get_records(response, HatGetException))
+        return got
 
     def post(self, *records: Record) -> Sequence[Record]:
         posted = []
-        by_dest = functools.partial(lambda record: record.endpoint)
-        groups = itertools.groupby(sorted(records, key=by_dest), by_dest)
-        for endpoint, records in groups:
+        for endpoint, records in _group_by_endpoint(*records):
             response = self._session.post(
                 url=self._endpoint_url(endpoint),
                 headers=self._auth_header(),
@@ -91,6 +92,11 @@ class HatClient:
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self._credential.username})"
+
+
+def _group_by_endpoint(*records: Record) -> Iterable[Sequence[Record]]:
+    by_endpoint = functools.partial(lambda record: record.endpoint)
+    return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
 
 
 def _get_records(response: Response, exception: Type) -> Sequence[Record]:
