@@ -11,7 +11,7 @@ from keyring.credentials import Credential
 from requests import HTTPError, JSONDecodeError, Response
 
 from hat.exceptions import *
-from hat.models import Record
+from hat.models import GetParameters, Record
 
 Records = Sequence[Record]
 
@@ -54,20 +54,29 @@ class HatClient:
         self._auth_token = auth_token
 
     @overload
-    def get(self, *endpoints: str) -> Records:
+    def get(self, *endpoints: str, parameters: GetParameters = None) -> Records:
         pass
 
     @overload
-    def get(self, *endpoints: Record) -> Records:
+    def get(
+            self,
+            *endpoints: Record,
+            parameters: GetParameters = None) -> Records:
         pass
 
-    def get(self, *endpoints: str | Record) -> Records:
+    def get(
+            self,
+            *endpoints: str | Record,
+            parameters: GetParameters = None
+    ) -> Records:
         got = []
         if isinstance(endpoints[0], Record):
             endpoints = (r.endpoint for r in endpoints)
         for endpoint in set(endpoints):
             response = self._session.get(
-                url=self._format_url(endpoint), headers=self._auth_header())
+                url=self._format_url(endpoint),
+                headers=self._auth_header(),
+                json=None if parameters is None else parameters.dict())
             got.extend(_get_records(response, HatGetException))
         return tuple(got)
 
@@ -118,6 +127,19 @@ class HatClient:
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self._credential.username})"
+
+
+# TODO Move to pydantic?
+def _format_get_parameters(order_by, ordering, skip, take):
+    parameters = {}
+    if order_by is not None:
+        parameters["orderBy"] = order_by
+        parameters["ordering"] = ordering
+    if skip is not None and skip >= 0:
+        parameters["skip"] = skip
+    if take is not None and 0 <= take <= 1000:
+        parameters["take"] = take
+    return parameters
 
 
 def _group_by_endpoint(*records: Record) -> Iterable[Tuple[Any, Records]]:
