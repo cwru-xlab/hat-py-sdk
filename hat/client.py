@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 import itertools
-from typing import Any, Iterable, Sequence, Tuple, Type, overload
+from typing import Iterable, Sequence, Tuple, Type, overload
 from urllib import parse
 
 import keyring
@@ -127,7 +127,7 @@ class HatClient:
         return f"{self.__class__.__name__}({self._credential.username})"
 
 
-def _group_by_endpoint(*records: Record) -> Iterable[Tuple[Any, Records]]:
+def _group_by_endpoint(*records: Record) -> Iterable[Tuple[str, Records]]:
     by_endpoint = functools.partial(lambda r: r.endpoint)
     return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
 
