@@ -69,20 +69,21 @@ class HatClient:
         got = []
         if isinstance(endpoints[0], Record):
             endpoints = (r.endpoint for r in endpoints)
+        headers = self._auth_header()
+        params = None if params is None else params.dict()
         for endpoint in set(endpoints):
             response = self._session.get(
-                url=self._format_url(endpoint),
-                headers=self._auth_header(),
-                json=None if params is None else params.dict())
+                url=self._format_url(endpoint), headers=headers, json=params)
             got.extend(_get_records(response, HatGetException))
         return tuple(got)
 
     def post(self, *records: Record) -> Records:
         posted = []
+        headers = self._auth_header()
         for endpoint, records in _group_by_endpoint(*records):
             response = self._session.post(
                 url=self._format_url(endpoint),
-                headers=self._auth_header(),
+                headers=headers,
                 json=[r.data for r in records])
             posted.extend(_get_records(response, HatPostException))
         return tuple(posted)
@@ -126,21 +127,8 @@ class HatClient:
         return f"{self.__class__.__name__}({self._credential.username})"
 
 
-# TODO Move to pydantic?
-def _format_get_parameters(order_by, ordering, skip, take):
-    parameters = {}
-    if order_by is not None:
-        parameters["orderBy"] = order_by
-        parameters["ordering"] = ordering
-    if skip is not None and skip >= 0:
-        parameters["skip"] = skip
-    if take is not None and 0 <= take <= 1000:
-        parameters["take"] = take
-    return parameters
-
-
 def _group_by_endpoint(*records: Record) -> Iterable[Tuple[Any, Records]]:
-    by_endpoint = functools.partial(lambda record: record.endpoint)
+    by_endpoint = functools.partial(lambda r: r.endpoint)
     return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
 
 
