@@ -29,7 +29,7 @@ class Ordering(str, enum.Enum):
 
 
 # noinspection PyMethodParameters
-class GetParameters(HatModel):
+class GetParams(HatModel):
     order_by: str = None
     ordering: Ordering = None
     skip: int = None
