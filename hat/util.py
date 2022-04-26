@@ -2,8 +2,8 @@ import abc
 import hashlib
 from typing import Any, final
 
-from client import HatClient
-from models import Record
+from .client import HatClient
+from .models import Record
 
 
 # noinspection PyMethodMayBeStatic

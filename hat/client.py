@@ -10,8 +10,8 @@ import requests
 from keyring.credentials import Credential
 from requests import HTTPError, JSONDecodeError, Response
 
-from hat.exceptions import *
-from hat.models import GetParams, Record
+from .exceptions import *
+from .models import GetParams, Record
 
 Records = Sequence[Record]
 
