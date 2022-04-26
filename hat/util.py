@@ -19,10 +19,11 @@ class BaseIndexClient(abc.ABC):
     def write(self, data: Any) -> None:
         index_record = self._get_index_record()
         key = self._get_key(data)
+        index = self._get_index(index_record)
         if key in self._get_index(index_record):
-            self._on_put(data)
+            self._on_put(data, index, key)
         else:
-            add_to_index = self._on_post(data)
+            add_to_index = self._on_post(data, index, key)
             self._update_index(index_record, add_to_index, key)
 
     @final
@@ -50,9 +51,9 @@ class BaseIndexClient(abc.ABC):
         return index_record.data["index"]
 
     @abc.abstractmethod
-    def _on_post(self, data: Any) -> Any:
+    def _on_post(self, data: Any, index: dict, key: str) -> Any:
         pass
 
     @abc.abstractmethod
-    def _on_put(self, data: Any) -> None:
+    def _on_put(self, data: Any, index: dict, key: str) -> None:
         pass
