@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from urllib import parse
-
 import functools
 import itertools
+from typing import Iterable, Sequence, Type, overload
+from urllib import parse
+
 import keyring
 import requests
 from keyring.credentials import Credential
 from requests import HTTPError, JSONDecodeError, Response, Session
-from typing import Iterable, Sequence, Type, overload
 
 from .exceptions import *
 from .models import GetParams, Record
@@ -39,13 +39,14 @@ def _get_content(response: Response, exception: Type) -> dict | list:
 
 
 class HatClient:
-    __slots__ = ("_credential", "_auth_token", "_session")
+    __slots__ = "_credential", "_auth_token", "_session"
 
     def __init__(
             self,
             credential: Credential | None = None,
             username: str | None = None,
-            session: Session | None = None):
+            session: Session | None = None,
+            **kwargs):
         self._set_credential(credential, username)
         self._session = session or requests.session()
         self._auth_token = None

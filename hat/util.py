@@ -4,9 +4,6 @@ import abc
 import hashlib
 from typing import Any
 
-from keyring.credentials import Credential
-from requests import Session
-
 from .client import HatClient
 from .models import Record
 
@@ -15,14 +12,8 @@ from .models import Record
 class BaseIndexedHatClient(abc.ABC, HatClient):
     __slots__ = "_endpoint"
 
-    def __init__(
-            self,
-            endpoint: str,
-            credential: Credential | None = None,
-            username: str | None = None,
-            session: Session | None = None):
-        super().__init__(
-            credential=credential, username=username, session=session)
+    def __init__(self, endpoint: str, **kwargs):
+        super().__init__(**kwargs)
         self._endpoint = endpoint
 
     def write(self, data: Any) -> None:
