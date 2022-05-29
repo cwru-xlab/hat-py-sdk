@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import functools
-import itertools
-from typing import Iterable, Sequence, Tuple, Type, overload
 from urllib import parse
 
+import functools
+import itertools
 import keyring
 import requests
 from keyring.credentials import Credential
-from requests import HTTPError, JSONDecodeError, Response
+from requests import HTTPError, JSONDecodeError, Response, Session
+from typing import Iterable, Sequence, Type, overload
 
 from .exceptions import *
 from .models import GetParams, Record
@@ -16,14 +16,36 @@ from .models import GetParams, Record
 Records = Sequence[Record]
 
 
+def _group_by_endpoint(*records: Record) -> Iterable[tuple[str, Records]]:
+    by_endpoint = functools.partial(lambda r: r.endpoint)
+    return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
+
+
+def _get_records(response: Response, exception: Type) -> Records:
+    content = _get_content(response, exception)
+    if isinstance(content, Sequence):
+        records = tuple(Record(**record) for record in content)
+    else:
+        records = (Record(**content),)
+    return records
+
+
+def _get_content(response: Response, exception: Type) -> dict | list:
+    try:
+        response.raise_for_status()
+        return response.json()
+    except (HTTPError, JSONDecodeError) as error:
+        raise exception(error)
+
+
 class HatClient:
     __slots__ = ("_credential", "_auth_token", "_session")
 
     def __init__(
             self,
-            credential: Credential = None,
-            username: str = None,
-            session: requests.Session = None):
+            credential: Credential | None = None,
+            username: str | None = None,
+            session: Session | None = None):
         self._set_credential(credential, username)
         self._session = session or requests.session()
         self._auth_token = None
@@ -64,7 +86,7 @@ class HatClient:
     def get(
             self,
             *endpoints: str | Record,
-            params: GetParams = None
+            params: GetParams | None = None
     ) -> Records:
         got = []
         if isinstance(endpoints[0], Record):
@@ -112,7 +134,7 @@ class HatClient:
             params={"records": records})
         _get_content(response, HatDeleteException)
 
-    def _format_url(self, endpoint: str = None) -> str:
+    def _format_url(self, endpoint: str | None = None) -> str:
         url = f"https://{self._credential.username}.hubat.net/api/v2.6/data"
         if endpoint is not None:
             url = parse.urljoin(f"{url}/", endpoint)
@@ -125,25 +147,3 @@ class HatClient:
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self._credential.username})"
-
-
-def _group_by_endpoint(*records: Record) -> Iterable[Tuple[str, Records]]:
-    by_endpoint = functools.partial(lambda r: r.endpoint)
-    return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
-
-
-def _get_records(response: Response, exception: Type) -> Records:
-    content = _get_content(response, exception)
-    if isinstance(content, Sequence):
-        records = tuple(Record(**record) for record in content)
-    else:
-        records = (Record(**content),)
-    return records
-
-
-def _get_content(response: Response, exception: Type) -> dict | list:
-    try:
-        response.raise_for_status()
-        return response.json()
-    except (HTTPError, JSONDecodeError) as error:
-        raise exception(error)
