@@ -1,21 +1,30 @@
+from __future__ import annotations
+
 import abc
 import hashlib
-from typing import Any, final
+from typing import Any
+
+from keyring.credentials import Credential
+from requests import Session
 
 from .client import HatClient
 from .models import Record
 
 
 # noinspection PyMethodMayBeStatic
-class BaseIndexClient(abc.ABC):
-    __slots__ = ("_client", "_endpoint")
+class BaseIndexedHatClient(abc.ABC, HatClient):
+    __slots__ = "_endpoint"
 
-    def __init__(self, client: HatClient, endpoint: str):
-        super().__init__()
-        self._client = client
+    def __init__(
+            self,
+            endpoint: str,
+            credential: Credential | None = None,
+            username: str | None = None,
+            session: Session | None = None):
+        super().__init__(
+            credential=credential, username=username, session=session)
         self._endpoint = endpoint
 
-    @final
     def write(self, data: Any) -> None:
         index_record = self._get_index_record()
         index = self._get_index(index_record)
@@ -26,9 +35,8 @@ class BaseIndexClient(abc.ABC):
             add_to_index = self._on_post(data)
             self._update_index(index_record, add_to_index, key)
 
-    @final
     def _get_index_record(self) -> Record:
-        if len(index_record := self._client.get(self._endpoint)) == 0:
+        if len(index_record := self.get(self._endpoint)) == 0:
             index_record = Record(data={"index": {}}, endpoint=self._endpoint)
         else:
             index_record = index_record[0]
@@ -37,16 +45,14 @@ class BaseIndexClient(abc.ABC):
     def _get_key(self, data: Any) -> str:
         return hashlib.sha256(str(data).encode()).hexdigest()
 
-    @final
     def _update_index(self, index_record: Record, add: Any, key: str) -> None:
         index = self._get_index(index_record)
         index[key] = add
         if len(index) == 1:
-            self._client.post(index_record)
+            self.post(index_record)
         else:
-            self._client.put(index_record)
+            self.put(index_record)
 
-    @final
     def _get_index(self, index_record: Record) -> dict:
         return index_record.data["index"]
 
