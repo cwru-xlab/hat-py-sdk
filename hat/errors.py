@@ -111,7 +111,7 @@ _auth_errors = ErrorMapping(AuthError)
 _auth_errors.put(401, WrongCredentialsError)
 _auth_errors.put(404, HatNotFoundError)
 
-_crud_errors = ErrorMapping(GetError)
+_crud_errors = ErrorMapping(HatError)
 _crud_errors.put(401, WrongTokenError)
 _crud_errors.put(403, LimitedTokenScopeError)
 
