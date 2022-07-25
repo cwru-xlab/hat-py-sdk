@@ -3,7 +3,9 @@ from __future__ import annotations
 import contextlib
 from typing import Any, Callable, Type
 
+import cachecontrol
 import requests
+from cachecontrol import heuristics
 from requests import Response
 
 JSON_MIMETYPE = "application/json"
@@ -41,7 +43,12 @@ class SessionMixin(contextlib.AbstractContextManager):
 
     def __init__(self, session: requests.Session | None = None):
         super().__init__()
-        self._session = session or requests.Session()
+        self._session = session or self._new_cached_session()
+
+    @staticmethod
+    def _new_cached_session() -> requests.Session:
+        return cachecontrol.CacheControl(
+            requests.Session(), heuristic=heuristics.OneDayCache())
 
     def __enter__(self):
         return self
