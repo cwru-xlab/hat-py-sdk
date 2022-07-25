@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 from typing import Any, Callable, Type
 
 import requests
@@ -21,8 +20,7 @@ def get_json(response: Response, on_error: OnError) -> dict | list:
 
 
 def get_string(response: Response, on_error: OnError) -> str:
-    decode = functools.partial(lambda r: response.content.decode())
-    return _handle_response(response, decode, on_error)
+    return _handle_response(response, lambda r: r.content.decode(), on_error)
 
 
 def _handle_response(
