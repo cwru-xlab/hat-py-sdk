@@ -21,7 +21,7 @@ def get_json(response: Response, on_error: OnError) -> dict | list:
 
 
 def get_string(response: Response, on_error: OnError) -> str:
-    return _handle_response(response, lambda r: r.content.decode(), on_error)
+    return _handle_response(response, lambda r: r.text, on_error)
 
 
 def _handle_response(
@@ -32,6 +32,8 @@ def _handle_response(
     except requests.RequestException as e:
         error = on_error(response.status_code, response.json())
         raise error(e)
+    finally:
+        response.close()  # Required for efficiency when streaming.
 
 
 class SessionMixin(contextlib.AbstractContextManager):
