@@ -139,8 +139,9 @@ class ApiOwnerToken(OwnerToken):
 
     def refresh(self) -> None:
         username = self.credential.username
+        url = urls.username_owner_token(username)
         response = self._session.get(
-            url=urls.username_owner_token(username),
+            url=utils.never_cache(url, self._session),
             headers={
                 "Accept": utils.JSON_MIMETYPE,
                 "username": username,
@@ -173,8 +174,9 @@ class AppToken(Token):
         return self._owner_token.domain
 
     def refresh(self) -> None:
+        url = urls.domain_app_token(self.domain, self.appname)
         response = self._session.get(
-            url=urls.domain_app_token(self.domain, self.appname),
+            url=utils.never_cache(url, self._session),
             headers=utils.token_header(self._owner_token.value))
         self._value = utils.get_json(response, errors.auth_error)["accessToken"]
         self._decoded = JwtAppToken.decode(

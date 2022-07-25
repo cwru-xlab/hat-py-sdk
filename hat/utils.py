@@ -58,3 +58,13 @@ class SessionMixin(contextlib.AbstractContextManager):
 
     def close(self):
         self._session.close()
+
+
+_never_cache_adapter = cachecontrol.CacheControlAdapter()
+_never_cache_adapter.cacheable_methods = {}
+
+
+def never_cache(url: str, session: requests.Session) -> str:
+    if url not in session.adapters:
+        session.mount(url, _never_cache_adapter)
+    return url
