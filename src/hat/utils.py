@@ -41,14 +41,19 @@ def _handle_response(
 class SessionMixin(contextlib.AbstractContextManager):
     __slots__ = "_session"
 
-    def __init__(self, session: requests.Session | None = None):
+    def __init__(
+            self,
+            session: requests.Session | None = None,
+            cache: bool = True,
+            stream: bool = True):
         super().__init__()
-        self._session = session or self._new_cached_session()
-
-    @staticmethod
-    def _new_cached_session() -> requests.Session:
-        return cachecontrol.CacheControl(
-            requests.Session(), heuristic=heuristics.OneDayCache())
+        if session is None:
+            session = requests.Session()
+            session.stream = stream
+            if cache:
+                session = cachecontrol.CacheControl(
+                    session, heuristic=heuristics.OneDayCache())
+        self._session = session
 
     def __enter__(self):
         return self

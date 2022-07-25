@@ -31,9 +31,13 @@ def _get_records(response: Response, on_error: OnError) -> HatRecords:
 class HatClient(utils.SessionMixin):
     __slots__ = "token", "namespace"
 
-    def __init__(self, token: Token, namespace: str | None = None):
-        super().__init__(token._session)
-        token._session.stream = True  # Avoid downloading when an error occurs.
+    def __init__(
+            self,
+            token: Token,
+            namespace: str | None = None,
+            share_session: bool = True,
+            **kwargs):
+        super().__init__(token._session if share_session else None, **kwargs)
         self.token = token
         self.namespace = namespace
 
