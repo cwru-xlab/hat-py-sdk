@@ -33,8 +33,7 @@ class HatClient(utils.SessionMixin):
 
     def __init__(self, token: Token, namespace: str | None = None):
         super().__init__(token._session)
-        # Avoid getting responses when error occurs.
-        token._session.stream = True
+        token._session.stream = True  # Avoid downloading when an error occurs.
         self.token = token
         self.namespace = namespace
 
