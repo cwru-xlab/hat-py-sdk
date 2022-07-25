@@ -1,6 +1,0 @@
-keyring~=23.4.0
-pydantic~=1.9.0
-pyhumps~=3.5.3
-requests~=2.27.1
-setuptools~=62.1.0
-# EOF
