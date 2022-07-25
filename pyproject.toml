@@ -8,6 +8,7 @@ readme = "README.md"
 homepage = "https://github.com/cwru-xlab/hat-py-sdk"
 repository = "https://github.com/cwru-xlab/hat-py-sdk"
 keywords = ["xlab", "dataswift", "hat", "python", "sdk"]
+packages = [{ include = "hat", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.9"
