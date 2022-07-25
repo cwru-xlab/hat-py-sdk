@@ -67,10 +67,10 @@ _V = tuple[Optional[_E], Optional[_Resolver]]
 
 
 class ErrorMapping(Generic[_T]):
-    __slots__ = "default", "_errors"
+    __slots__ = "_default", "_errors"
 
     def __init__(self, default: _E):
-        self.default = default
+        self._default = default
         self._errors = self._new_map(default)
 
     @staticmethod
@@ -93,6 +93,10 @@ class ErrorMapping(Generic[_T]):
 
     def update(self, mapping: ErrorMapping) -> None:
         self._errors.update(mapping._errors)
+
+    @property
+    def default(self) -> _E:
+        return self._default
 
 
 def _resolve_put_400(content: dict) -> Type[PutError]:
