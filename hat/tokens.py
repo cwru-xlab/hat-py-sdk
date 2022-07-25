@@ -107,7 +107,7 @@ class Token(abc.ABC, utils.SessionMixin):
     def expired(self) -> bool:
         return self._expires_at <= datetime.datetime.utcnow()
 
-    def _compute_expiration(self) -> datetime:
+    def _compute_expiration(self) -> datetime.datetime:
         if self._decoded is None:
             self.refresh()
         iat = datetime.datetime.utcfromtimestamp(float(self._decoded.iat))
