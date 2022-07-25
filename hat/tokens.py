@@ -69,7 +69,7 @@ class JwtAppToken(JwtToken):
         return JwtAppToken(**super().decode(encoded, **kwargs))
 
 
-class Token(abc.ABC, utils.SessionMixin):
+class Token(utils.SessionMixin, abc.ABC):
     __slots__ = "_value", "_decoded", "_pk", "_ttl", "_expires_at"
 
     def __init__(self, **kwargs):
