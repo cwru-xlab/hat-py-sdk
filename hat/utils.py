@@ -4,7 +4,7 @@ import contextlib
 from typing import Any, Callable, Type
 
 import requests
-from requests import Response, Session
+from requests import Response
 
 JSON_MIMETYPE = "application/json"
 
@@ -37,9 +37,9 @@ def _handle_response(
 class SessionMixin(contextlib.AbstractContextManager):
     __slots__ = "_session"
 
-    def __init__(self, session: Session | None = None):
+    def __init__(self, session: requests.Session | None = None):
         super().__init__()
-        self._session = session or requests.session()
+        self._session = session or requests.Session()
 
     def __enter__(self):
         return self
