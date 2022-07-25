@@ -5,10 +5,11 @@ from enum import Enum
 from typing import Generic, Optional, TypeVar
 
 from humps import camel
-from pydantic import BaseModel, Field, NonNegativeInt, StrictStr, conint, constr
+from pydantic import BaseModel, Field, NonNegativeInt, conint, constr
 from pydantic.generics import GenericModel
 
 _T = TypeVar("_T")
+StrictStr = constr(strict=True)  # Plays nicely with type checking
 
 
 class HatModel(BaseModel, ABC):
