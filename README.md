@@ -6,7 +6,7 @@ Python [Dataswift HAT SDK](https://api.dataswift.io/).
 
 - Authentication with owner tokens (via API or web auth) and application tokens
 - Automatic token refreshing and verification
-- Keyring credentials owner token authentication
+- Supports any keyring credential for API owner token authentication
 - All Direct Data API operations:
   - `POST`: groups records by endpoint to minimize request bandwidth
   - `GET`: supports multiple endpoints and options
