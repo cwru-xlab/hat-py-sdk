@@ -79,9 +79,7 @@ class ErrorMapping(Generic[_T]):
 
     def get(self, status: int, content: Any) -> _E:
         error, resolver = self._errors[status]
-        if resolver is not None:
-            error = resolver(content)
-        return error
+        return error if resolver is None else resolver(content)
 
     def put(
             self,
@@ -89,10 +87,8 @@ class ErrorMapping(Generic[_T]):
             error: _E | None = None,
             resolver: _Resolver | None = None
     ) -> None:
-        if error is None and resolver is None:
-            raise ValueError("'error' or 'resolver' must be specified")
-        if error is not None and resolver is not None:
-            raise ValueError("'error' and 'resolver' may not both be specified")
+        if not (error is None) ^ (resolver is None):
+            raise ValueError("Either 'error' or 'resolver' must be specified")
         self._errors[status] = (error, resolver)
 
     def update(self, mapping: ErrorMapping) -> None:
