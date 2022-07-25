@@ -1,57 +1,55 @@
-# noinspection PyPackageRequirements
 from __future__ import annotations
 
-import enum
+from abc import ABC
+from enum import Enum
+from typing import Generic, Optional, TypeVar
 
-import humps
-from pydantic import BaseModel, Field, validator
+from humps import camel
+from pydantic import BaseModel, Field, NonNegativeInt, conint, constr
+from pydantic.generics import GenericModel
+
+_T = TypeVar("_T")
+StrictStr = constr(strict=True)  # Plays nicely with type checking
 
 
-class HatModel(BaseModel):
+class HatModel(BaseModel, ABC):
     class Config:
-        alias_generator = humps.camelize
         allow_population_by_field_name = True
         use_enum_values = True
 
-    def dict(self, *args, **kwargs):
-        return super().dict(*args, by_alias=True, **kwargs)
+
+class HatRecord(HatModel, GenericModel, Generic[_T]):
+    endpoint: Optional[StrictStr]
+    record_id: Optional[StrictStr]
+    data: Optional[_T] = Field(default_factory=dict)
+
+    class Config:
+        alias_generator = camel.case
+        allow_mutation = False
+
+    def dict(self, by_alias: bool = True, **kwargs) -> dict:
+        return super().dict(by_alias=by_alias, **kwargs)
+
+    def json(self, by_alias: bool = True, **kwargs) -> str | None:
+        return super().json(by_alias=by_alias, **kwargs)
 
 
-class Record(HatModel):
-    endpoint: str = None
-    record_id: str = None
-    data: dict = Field(default_factory=dict)
-
-
-class Ordering(str, enum.Enum):
+class Ordering(str, Enum):
     ASCENDING = "ascending"
     DESCENDING = "descending"
 
 
-# noinspection PyMethodParameters
-class GetParams(HatModel):
-    order_by: str = None
-    ordering: Ordering = None
-    skip: int = None
-    take: int = None
+class GetOpts(HatModel):
+    order_by: Optional[constr(min_length=1)]
+    ordering: Optional[Ordering]
+    skip: Optional[NonNegativeInt]
+    take: Optional[conint(ge=0, le=1000)]
 
-    @validator("order_by")
-    def validate_order_by(cls, value) -> str:
-        if value == "":
-            raise ValueError("'order_by' must not be the empty string")
-        return value
+    class Config:
+        alias_generator = camel.case
 
-    @validator("skip")
-    def validate_skip(cls, value) -> str:
-        if value < 0:
-            raise ValueError("'skip' must be non-negative")
-        return value
+    def dict(self, exclude_none: bool = True, **kwargs) -> dict:
+        return super().dict(exclude_none=exclude_none, **kwargs)
 
-    @validator("take")
-    def validate_take(cls, value) -> int:
-        if value < 0 or value > 1000:
-            raise ValueError("'take' must be between 0 and 1000, inclusive")
-        return value
-
-    def dict(self, *args, **kwargs):
-        return super().dict(exclude_none=True)
+    def json(self, exclude_none: bool = True, **kwargs) -> str | None:
+        return super().json(exclude_none=exclude_none, **kwargs)
