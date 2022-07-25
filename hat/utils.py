@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from typing import Any, Callable, Type
 
 import requests
@@ -33,11 +34,18 @@ def _handle_response(
         raise error(e)
 
 
-class SessionMixin:
+class SessionMixin(contextlib.AbstractContextManager):
     __slots__ = "_session"
 
     def __init__(self, session: Session | None = None):
+        super().__init__()
         self._session = session or requests.session()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._session.__exit__(exc_type, exc_val, exc_tb)
 
     def close(self):
         self._session.close()
