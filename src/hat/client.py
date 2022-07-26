@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import functools
 import itertools
-from typing import Iterable, Sequence
+import re
+from typing import Iterable, Optional, Sequence
 
 from requests import Response
 
@@ -12,9 +13,10 @@ from .tokens import Token
 from .utils import OnError
 
 HatRecords = list[HatRecord]
+IHatRecords = Iterable[HatRecord]
 
 
-def group_by_endpoint(*records: HatRecord) -> Iterable[tuple[str, HatRecords]]:
+def group_by_endpoint(records: IHatRecords) -> Iterable[tuple[str, HatRecords]]:
     by_endpoint = functools.partial(lambda r: r.endpoint)
     return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
 
@@ -28,8 +30,22 @@ def get_records(response: Response, on_error: OnError) -> HatRecords:
     return records
 
 
+def require_endpoint(records: Iterable[str | HatRecord]) -> IHatRecords:
+    for record in records:
+        if isinstance(record, HatRecord) and record.endpoint is None:
+            raise ValueError("'endpoint' is required")
+        yield record
+
+
+def require_record_id(records: Iterable[str | HatRecord]) -> IHatRecords:
+    for record in records:
+        if isinstance(record, HatRecord) and record.record_id is None:
+            raise ValueError("'record_id' is required")
+        yield record
+
+
 class HatClient(utils.SessionMixin):
-    __slots__ = "token", "namespace"
+    __slots__ = "token", "_namespace", "_ns_pattern"
 
     def __init__(
             self,
@@ -46,7 +62,7 @@ class HatClient(utils.SessionMixin):
             *endpoints: str | HatRecord,
             options: GetOpts | None = None
     ) -> HatRecords:
-        endpoints = [e if isinstance(e, str) else e.endpoint for e in endpoints]
+        endpoints = self._prepare_get(endpoints)
         options = None if options is None else options.dict()
         headers = self._auth_header()
         got = []
@@ -57,29 +73,59 @@ class HatClient(utils.SessionMixin):
         return got
 
     def post(self, *records: HatRecord) -> HatRecords:
-        posted = []
+        post = self._prepare_post(records)
         headers = self._auth_header()
-        for endpoint, records in group_by_endpoint(*records):
+        posted = []
+        for endpoint, records in group_by_endpoint(records):
             response = self._session.post(
-                url=self._endpoint_url(endpoint),
-                headers=headers,
-                json=[r.data for r in records])
+                url=self._endpoint_url(endpoint), headers=headers, json=post)
             posted.extend(get_records(response, errors.post_error))
         return posted
 
     def put(self, *records: HatRecord) -> HatRecords:
-        put = [r.dict() for r in records]
+        put = self._prepare_put(records)
         response = self._session.put(
             url=self._data_url(), headers=self._auth_header(), json=put)
         return get_records(response, errors.put_error)
 
     def delete(self, *records: str | HatRecord) -> None:
-        records = [r if isinstance(r, str) else r.record_id for r in records]
+        delete = self._prepare_delete(records)
         response = self._session.delete(
             url=self._data_url(),
             headers=self._auth_header(),
-            params={"records": records})
+            params={"records": delete})
         get_records(response, errors.delete_error)
+
+    @staticmethod
+    def _prepare_get(records: Iterable[str | HatRecord]) -> list[str]:
+        return [
+            rec if isinstance(rec, str) else rec.endpoint
+            for rec in require_endpoint(records)]
+
+    def _prepare_post(self, records: IHatRecords) -> list:
+        ns, pattern = self.namespace, self._ns_pattern
+        prepared = []
+        for rec in require_endpoint(records):
+            if pattern.match(rec.endpoint):
+                endpoint = pattern.split(rec.endpoint)[-1]
+                rec = HatRecord.copy(rec, update={"endpoint": endpoint})
+            prepared.append(rec.data)
+        return prepared
+
+    def _prepare_put(self, records: IHatRecords) -> list[dict]:
+        ns, pattern = self.namespace, self._ns_pattern
+        prepared = []
+        for rec in require_endpoint(records):
+            if pattern.match(e := rec.endpoint) is None:
+                rec = HatRecord.copy(rec, update={"endpoint": f"{ns}/{e}"})
+            prepared.append(rec.dict())
+        return prepared
+
+    @staticmethod
+    def _prepare_delete(records: Iterable[str | HatRecord]) -> list[str]:
+        return [
+            rec if isinstance(rec, str) else rec.record_id
+            for rec in require_record_id(records)]
 
     def _auth_header(self) -> dict[str, str]:
         return utils.token_header(self.token.value)
@@ -88,7 +134,19 @@ class HatClient(utils.SessionMixin):
         return urls.domain_data(self.token.domain)
 
     def _endpoint_url(self, endpoint: str) -> str:
-        if self.namespace is None:
-            raise ValueError("'namespace' must be set to access endpoint data")
+        if self._namespace is None:
+            raise ValueError("'namespace' is required to access endpoint data")
         return urls.domain_endpoint(
-            self.token.domain, self.namespace, endpoint)
+            self.token.domain, self._namespace, endpoint)
+
+    @property
+    def namespace(self) -> Optional[str]:
+        return self._namespace
+
+    @namespace.setter
+    def namespace(self, value: str) -> None:
+        if value:
+            self._namespace = value
+            self._ns_pattern = re.compile(f"^{value}/")
+        else:
+            self._ns_pattern = re.compile(".*")
