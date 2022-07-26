@@ -1,4 +1,4 @@
-from .client import HatClient, HatRecord, HatRecords
+from .client import HatClient, HatRecord
 from .errors import (AuthError, DeleteError, DuplicateDataError, GetError,
                      HatError, HatNotFoundError, LimitedTokenScopeError,
                      MalformedBodyError, MissingPathError, PostError, PutError,
