@@ -16,16 +16,14 @@ class HatModel(BaseModel, ABC):
     class Config:
         allow_population_by_field_name = True
         use_enum_values = True
+        allow_mutation = False
+        alias_generator = camel.case
 
 
 class HatRecord(HatModel, GenericModel, Generic[_T]):
     endpoint: Optional[StrictStr]
     record_id: Optional[StrictStr]
     data: Optional[_T] = Field(default_factory=dict)
-
-    class Config:
-        alias_generator = camel.case
-        allow_mutation = False
 
     def dict(self, by_alias: bool = True, **kwargs) -> dict:
         return super().dict(by_alias=by_alias, **kwargs)
@@ -44,9 +42,6 @@ class GetOpts(HatModel):
     ordering: Optional[Ordering]
     skip: Optional[NonNegativeInt]
     take: Optional[conint(ge=0, le=1000)]
-
-    class Config:
-        alias_generator = camel.case
 
     def dict(self, exclude_none: bool = True, **kwargs) -> dict:
         return super().dict(exclude_none=exclude_none, **kwargs)
