@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import re
 
-_API_VERSION = "v2.6"
-_SCHEME = "https"
-_SCHEME_PATTERN = re.compile('(?:http|https):/+')
+API_VERSION = "v2.6"
+SCHEME = "https"
+SCHEME_PATTERN = re.compile('(?:http|https):/+')
 
 
 def with_scheme(url: str) -> str:
-    if _SCHEME_PATTERN.match(url) is None:
+    if SCHEME_PATTERN.match(url) is None:
         base = url
     else:
-        base = _SCHEME_PATTERN.split(url)[-1]
-    return f"{_SCHEME}://{base}"
+        base = SCHEME_PATTERN.split(url)[-1]
+    return f"{SCHEME}://{base}"
 
 
 def hat_domain(username: str) -> str:
@@ -48,7 +48,7 @@ def username_api(username: str) -> str:
 
 
 def domain_api(domain: str) -> str:
-    return with_scheme(f"{domain}/api/{_API_VERSION}")
+    return with_scheme(f"{domain}/api/{API_VERSION}")
 
 
 def username_data(username: str) -> str:

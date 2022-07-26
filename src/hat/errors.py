@@ -60,32 +60,32 @@ class LimitedTokenScopeError(GetError, PostError, PutError, DeleteError):
     pass
 
 
-_T = TypeVar("_T", bound=Exception)
-_E = Type[_T]
-_Resolver = Callable[[Any], _E]
-_V = tuple[Optional[_E], Optional[_Resolver]]
+T = TypeVar("T", bound=Exception)
+E = Type[T]
+Resolver = Callable[[Any], E]
+V = tuple[Optional[E], Optional[Resolver]]
 
 
-class ErrorMapping(Generic[_T]):
+class ErrorMapping(Generic[T]):
     __slots__ = "_default", "_errors"
 
-    def __init__(self, default: _E):
+    def __init__(self, default: E):
         self._default = default
         self._errors = self._new_map(default)
 
     @staticmethod
-    def _new_map(default: _E) -> dict[int, _V]:
+    def _new_map(default: E) -> dict[int, V]:
         return collections.defaultdict(lambda: (default, None))
 
-    def get(self, status: int, content: Any) -> _E:
+    def get(self, status: int, content: Any) -> E:
         error, resolver = self._errors[status]
         return error if resolver is None else resolver(content)
 
     def put(
             self,
             status: int,
-            error: _E | None = None,
-            resolver: _Resolver | None = None
+            error: E | None = None,
+            resolver: Resolver | None = None
     ) -> None:
         if not (error is None) ^ (resolver is None):
             raise ValueError("Either 'error' or 'resolver' must be specified")
@@ -95,11 +95,11 @@ class ErrorMapping(Generic[_T]):
         self._errors.update(mapping._errors)
 
     @property
-    def default(self) -> _E:
+    def default(self) -> E:
         return self._default
 
 
-def _resolve_put_400(content: dict) -> Type[PutError]:
+def resolve_put_400(content: dict) -> Type[PutError]:
     if isinstance(content["message"], str):
         error = MalformedBodyError
     else:
@@ -107,45 +107,45 @@ def _resolve_put_400(content: dict) -> Type[PutError]:
     return error
 
 
-_auth_errors = ErrorMapping(AuthError)
-_auth_errors.put(401, WrongCredentialsError)
-_auth_errors.put(404, HatNotFoundError)
+auth_errors = ErrorMapping(AuthError)
+auth_errors.put(401, WrongCredentialsError)
+auth_errors.put(404, HatNotFoundError)
 
-_crud_errors = ErrorMapping(HatError)
-_crud_errors.put(401, WrongTokenError)
-_crud_errors.put(403, LimitedTokenScopeError)
+crud_errors = ErrorMapping(HatError)
+crud_errors.put(401, WrongTokenError)
+crud_errors.put(403, LimitedTokenScopeError)
 
-_get_errors = ErrorMapping(GetError)
-_get_errors.update(_crud_errors)
+get_errors = ErrorMapping(GetError)
+get_errors.update(crud_errors)
 
-_post_errors = ErrorMapping(PostError)
-_post_errors.update(_crud_errors)
-_post_errors.put(400, DuplicateDataError)
+post_errors = ErrorMapping(PostError)
+post_errors.update(crud_errors)
+post_errors.put(400, DuplicateDataError)
 
-_put_errors = ErrorMapping(PutError)
-_put_errors.update(_crud_errors)
-_put_errors.put(400, resolver=_resolve_put_400)
+put_errors = ErrorMapping(PutError)
+put_errors.update(crud_errors)
+put_errors.put(400, resolver=resolve_put_400)
 
-_delete_errors = ErrorMapping(DeleteError)
-_delete_errors.update(_crud_errors)
-_delete_errors.put(400, RecordNotFoundError)
+delete_errors = ErrorMapping(DeleteError)
+delete_errors.update(crud_errors)
+delete_errors.put(400, RecordNotFoundError)
 
 
 def auth_error(status: int, content: Any) -> Type[AuthError]:
-    return _auth_errors.get(status, content)
+    return auth_errors.get(status, content)
 
 
 def get_error(status: int, content: Any) -> Type[GetError]:
-    return _get_errors.get(status, content)
+    return get_errors.get(status, content)
 
 
 def post_error(status: int, content: Any) -> Type[PostError]:
-    return _post_errors.get(status, content)
+    return post_errors.get(status, content)
 
 
 def put_error(status: int, content: Any) -> Type[PutError]:
-    return _put_errors.get(status, content)
+    return put_errors.get(status, content)
 
 
 def delete_error(status: int, content: Any) -> Type[DeleteError]:
-    return _delete_errors.get(status, content)
+    return delete_errors.get(status, content)

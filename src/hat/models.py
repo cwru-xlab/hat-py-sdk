@@ -8,7 +8,7 @@ from humps import camel
 from pydantic import BaseModel, Field, NonNegativeInt, conint, constr
 from pydantic.generics import GenericModel
 
-_T = TypeVar("_T")
+T = TypeVar("T")
 StrictStr = constr(strict=True)  # Plays nicely with type checking
 
 
@@ -20,10 +20,10 @@ class HatModel(BaseModel, ABC):
         alias_generator = camel.case
 
 
-class HatRecord(HatModel, GenericModel, Generic[_T]):
+class HatRecord(HatModel, GenericModel, Generic[T]):
     endpoint: Optional[StrictStr]
     record_id: Optional[StrictStr]
-    data: Optional[_T] = Field(default_factory=dict)
+    data: Optional[T] = Field(default_factory=dict)
 
     def dict(self, by_alias: bool = True, **kwargs) -> dict:
         return super().dict(by_alias=by_alias, **kwargs)

@@ -6,25 +6,18 @@ import re
 from typing import Optional
 
 import jwt
-import pydantic
-from humps import camel
 from keyring.credentials import Credential
 from pydantic import PositiveInt, StrictStr, constr
 
-from . import errors, urls, utils
+from . import errors, models, urls, utils
 
-_JWT_PATTERN = re.compile("^(?:[\w-]*\.){2}[\w-]*$")
+JWT_PATTERN = re.compile("^(?:[\w-]*\.){2}[\w-]*$")
 
 
-class JwtToken(pydantic.BaseModel):
+class JwtToken(models.HatModel):
     exp: PositiveInt
     iat: PositiveInt
     iss: constr(regex="[a-zA-Z0-9]+.hubat.net", strict=True)
-
-    class Config:
-        allow_population_by_field_name = True
-        alias_generator = camel.case
-        frozen = True
 
     @classmethod
     def decode(
@@ -37,7 +30,7 @@ class JwtToken(pydantic.BaseModel):
     ) -> dict | JwtToken:
         if verify_sig and pk is None:
             raise ValueError("'pk' is required if 'verify_sig' is True")
-        if _JWT_PATTERN.fullmatch(encoded) is None:
+        if JWT_PATTERN.fullmatch(encoded) is None:
             raise ValueError(f"'encoded' has improper syntax:\n{encoded}")
         try:
             payload = jwt.decode(
@@ -81,11 +74,11 @@ class Token(utils.SessionMixin, abc.ABC):
         self._expires_at = datetime.datetime.max
 
     @property
-    def pk(self):
+    def pk(self) -> str:
         if self._pk is None:
             url = urls.domain_public_key(self.domain)
-            response = self._session.get(url)
-            self._pk = utils.get_string(response, errors.auth_error)
+            resp = self._session.get(url)
+            self._pk = utils.get_string(resp, errors.auth_error)
         return self._pk
 
     @property
@@ -140,13 +133,13 @@ class ApiOwnerToken(OwnerToken):
     def refresh(self) -> None:
         username = self.credential.username
         url = urls.username_owner_token(username)
-        response = self._session.get(
+        resp = self._session.get(
             url=utils.never_cache(url, self._session),
             headers={
                 "Accept": utils.JSON_MIMETYPE,
                 "username": username,
                 "password": self.credential.password})
-        self._value = utils.get_json(response, errors.auth_error)["accessToken"]
+        self._value = utils.get_json(resp, errors.auth_error)["accessToken"]
         self._decoded = JwtOwnerToken.decode(
             self._value, pk=self.pk, verify_sig=True)
         self._expires_at = self._compute_expiration()
@@ -175,10 +168,10 @@ class AppToken(Token):
 
     def refresh(self) -> None:
         url = urls.domain_app_token(self.domain, self.appname)
-        response = self._session.get(
+        resp = self._session.get(
             url=utils.never_cache(url, self._session),
             headers=utils.token_header(self._owner_token.value))
-        self._value = utils.get_json(response, errors.auth_error)["accessToken"]
+        self._value = utils.get_json(resp, errors.auth_error)["accessToken"]
         self._decoded = JwtAppToken.decode(
             self._value, pk=self.pk, verify_sig=True)
         self._expires_at = self._compute_expiration()
