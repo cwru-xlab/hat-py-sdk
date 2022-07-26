@@ -62,11 +62,11 @@ class HatClient(utils.SessionMixin):
             *endpoints: str | HatRecord,
             options: GetOpts | None = None
     ) -> HatRecords:
-        endpoints = self._prepare_get(endpoints)
+        get = self._prepare_get(endpoints)
         options = None if options is None else options.dict()
         headers = self._auth_header()
         got = []
-        for endpoint in endpoints:
+        for endpoint in get:
             url = self._endpoint_url(endpoint)
             response = self._session.get(url=url, headers=headers, json=options)
             got.extend(get_records(response, errors.get_error))
@@ -103,11 +103,10 @@ class HatClient(utils.SessionMixin):
             for rec in require_endpoint(records)]
 
     def _prepare_post(self, records: IHatRecords) -> list:
-        ns, pattern = self.namespace, self._ns_pattern
         prepared = []
         for rec in require_endpoint(records):
-            if pattern.match(rec.endpoint):
-                endpoint = pattern.split(rec.endpoint)[-1]
+            if self._ns_pattern.match(rec.endpoint):
+                endpoint = self._ns_pattern.split(rec.endpoint)[-1]
                 rec = HatRecord.copy(rec, update={"endpoint": endpoint})
             prepared.append(rec.data)
         return prepared
