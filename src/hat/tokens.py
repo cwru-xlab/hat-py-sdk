@@ -17,7 +17,7 @@ JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
 class JwtToken(models.HatModel):
     exp: PositiveInt
     iat: PositiveInt
-    iss: constr(regex=r"\w+.hubat.net", strict=True)
+    iss: constr(regex=r"^\w+\.hubat\.net$", strict=True)
 
     @classmethod
     def decode(
@@ -30,7 +30,7 @@ class JwtToken(models.HatModel):
     ) -> dict | JwtToken:
         if verify_sig and pk is None:
             raise ValueError("'pk' is required if 'verify_sig' is True")
-        if JWT_PATTERN.fullmatch(encoded) is None:
+        if JWT_PATTERN.match(encoded) is None:
             raise ValueError(f"'encoded' has improper syntax:\n{encoded}")
         try:
             payload = jwt.decode(
@@ -44,7 +44,7 @@ class JwtToken(models.HatModel):
 
 
 class JwtOwnerToken(JwtToken):
-    access_scope: constr(regex="owner", strict=True)
+    access_scope: constr(regex="^owner$", strict=True)
 
     @classmethod
     def decode(cls, encoded: str, **kwargs) -> JwtOwnerToken:
@@ -54,7 +54,7 @@ class JwtOwnerToken(JwtToken):
 
 class JwtAppToken(JwtToken):
     application: StrictStr
-    application_version: constr(regex=r"\d+.\d+.\d+", strict=True)
+    application_version: constr(regex=r"^\d+.\d+.\d+\$", strict=True)
 
     @classmethod
     def decode(cls, encoded: str, **kwargs) -> JwtAppToken:
