@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import Iterable, Optional, Sequence
+from typing import Callable, Iterable, Sequence
 
 from requests import Response
 
@@ -44,8 +44,18 @@ def require_record_id(records: Iterable[str | HatRecord]) -> IHatRecords:
         yield record
 
 
+def requires_namespace(method: Callable) -> Callable:
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if self.namespace is None:
+            raise ValueError("'namespace' is required to access endpoint data")
+        return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 class HatClient(utils.SessionMixin):
-    __slots__ = "token", "_namespace", "_ns_pattern"
+    __slots__ = "_token", "_namespace", "_pattern"
 
     def __init__(
             self,
@@ -54,9 +64,19 @@ class HatClient(utils.SessionMixin):
             share_session: bool = True,
             **kwargs):
         super().__init__(token._session if share_session else None, **kwargs)
-        self.token = token
-        self.namespace = namespace
+        self._token = token
+        self._namespace = namespace
+        self._pattern = re.compile(f"^{namespace}/")
 
+    @property
+    def namespace(self) -> str | None:
+        return self._namespace
+
+    @property
+    def token(self) -> Token:
+        return self._token
+
+    @requires_namespace
     def get(
             self,
             *endpoints: str | HatRecord,
@@ -72,6 +92,7 @@ class HatClient(utils.SessionMixin):
             got.extend(get_records(response, errors.get_error))
         return got
 
+    @requires_namespace
     def post(self, *records: HatRecord) -> HatRecords:
         post = self._prepare_post(records)
         headers = self._auth_header()
@@ -103,16 +124,17 @@ class HatClient(utils.SessionMixin):
             for rec in require_endpoint(records)]
 
     def _prepare_post(self, records: IHatRecords) -> list:
+        pattern = self._pattern
         prepared = []
         for rec in require_endpoint(records):
-            if self._ns_pattern.match(rec.endpoint):
-                endpoint = self._ns_pattern.split(rec.endpoint)[-1]
+            if pattern.match(rec.endpoint):
+                endpoint = pattern.split(rec.endpoint)[-1]
                 rec = HatRecord.copy(rec, update={"endpoint": endpoint})
             prepared.append(rec.data)
         return prepared
 
     def _prepare_put(self, records: IHatRecords) -> list[dict]:
-        ns, pattern = self.namespace, self._ns_pattern
+        ns, pattern = self.namespace, self._pattern
         prepared = []
         for rec in require_endpoint(records):
             if pattern.match(e := rec.endpoint) is None:
@@ -133,19 +155,4 @@ class HatClient(utils.SessionMixin):
         return urls.domain_data(self.token.domain)
 
     def _endpoint_url(self, endpoint: str) -> str:
-        if self._namespace is None:
-            raise ValueError("'namespace' is required to access endpoint data")
-        return urls.domain_endpoint(
-            self.token.domain, self._namespace, endpoint)
-
-    @property
-    def namespace(self) -> Optional[str]:
-        return self._namespace
-
-    @namespace.setter
-    def namespace(self, value: str) -> None:
-        if value:
-            self._namespace = value
-            self._ns_pattern = re.compile(f"^{value}/")
-        else:
-            self._ns_pattern = re.compile(".*")
+        return urls.domain_endpoint(self.token.domain, self.namespace, endpoint)
