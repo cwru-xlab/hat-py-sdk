@@ -66,7 +66,7 @@ class HatClient(utils.SessionMixin):
         super().__init__(token._session if share_session else None, **kwargs)
         self._token = token
         self._namespace = namespace
-        self._pattern = re.compile(f"^{namespace}/")
+        self._pattern = re.compile(rf"^{namespace}/")
 
     @property
     def namespace(self) -> str | None:

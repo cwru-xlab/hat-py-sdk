@@ -11,13 +11,13 @@ from pydantic import PositiveInt, StrictStr, constr
 
 from . import errors, models, urls, utils
 
-JWT_PATTERN = re.compile("^(?:[\w-]*\.){2}[\w-]*$")
+JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
 
 
 class JwtToken(models.HatModel):
     exp: PositiveInt
     iat: PositiveInt
-    iss: constr(regex="[a-zA-Z0-9]+.hubat.net", strict=True)
+    iss: constr(regex=r"\w+.hubat.net", strict=True)
 
     @classmethod
     def decode(

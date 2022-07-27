@@ -4,7 +4,7 @@ import re
 
 API_VERSION = "v2.6"
 SCHEME = "https"
-SCHEME_PATTERN = re.compile('(?:http|https):/+')
+SCHEME_PATTERN = re.compile(r"^(?:http|https):/+")
 
 
 def with_scheme(url: str) -> str:
