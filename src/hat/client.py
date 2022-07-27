@@ -87,8 +87,8 @@ class HatClient(utils.SessionMixin):
         headers = self._auth_header()
         got = []
         for endpoint in get:
-            url = self._endpoint_url(endpoint)
-            response = self._session.get(url=url, headers=headers, json=options)
+            response = self._session.get(
+                url=self._endpoint_url(endpoint), headers=headers, json=options)
             got.extend(get_records(response, errors.get_error))
         return got
 
@@ -127,6 +127,8 @@ class HatClient(utils.SessionMixin):
         pattern = self._pattern
         prepared = []
         for rec in require_endpoint(records):
+            # The namespace is added when constructing the endpoint URL,
+            # so it should not be a part of the endpoint here.
             if pattern.match(rec.endpoint):
                 endpoint = pattern.split(rec.endpoint)[-1]
                 rec = HatRecord.copy(rec, update={"endpoint": endpoint})
@@ -137,6 +139,9 @@ class HatClient(utils.SessionMixin):
         ns, pattern = self.namespace, self._pattern
         prepared = []
         for rec in require_endpoint(records):
+            # The endpoint should include the namespace. HatRecords created
+            # from responses will include the namespace. This is just a
+            # convenience if wanting to create HatRecords manually.
             if pattern.match(e := rec.endpoint) is None:
                 rec = HatRecord.copy(rec, update={"endpoint": f"{ns}/{e}"})
             prepared.append(rec.dict())
