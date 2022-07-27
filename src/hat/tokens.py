@@ -54,7 +54,7 @@ class JwtOwnerToken(JwtToken):
 
 class JwtAppToken(JwtToken):
     application: StrictStr
-    application_version: constr(regex="[0-9]+.[0-9]+.[0-9]+", strict=True)
+    application_version: constr(regex=r"\d+.\d+.\d+", strict=True)
 
     @classmethod
     def decode(cls, encoded: str, **kwargs) -> JwtAppToken:
