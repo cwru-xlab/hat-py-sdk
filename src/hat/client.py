@@ -95,8 +95,8 @@ class HatClient(utils.SessionMixin):
     def post(self, *records: HatRecord) -> HatRecords:
         post = self._prepare_post(records)
         posted = []
-        for endpoint, records in group_by_endpoint(records):
-            res = self._endpoint_request("POST", endpoint, json=post)
+        for endpoint, records in post:
+            res = self._endpoint_request("POST", endpoint, json=records)
             posted.extend(get_records(res, errors.post_error))
         return posted
 
@@ -128,7 +128,8 @@ class HatClient(utils.SessionMixin):
             rec if isinstance(rec, str) else rec.endpoint
             for rec in require_endpoint(records)]
 
-    def _prepare_post(self, records: IHatRecords) -> list:
+    def _prepare_post(
+            self, records: IHatRecords) -> Iterable[tuple[str, HatRecords]]:
         pattern = self._pattern
         prepared = []
         for rec in require_endpoint(records):
@@ -137,8 +138,8 @@ class HatClient(utils.SessionMixin):
             if pattern.match(rec.endpoint):
                 endpoint = pattern.split(rec.endpoint)[-1]
                 rec = HatRecord.copy(rec, update={"endpoint": endpoint})
-            prepared.append(rec.data)
-        return prepared
+            prepared.append(rec)
+        return group_by_endpoint(prepared)
 
     def _prepare_put(self, records: IHatRecords) -> list[dict]:
         ns, pattern = self.namespace, self._pattern
