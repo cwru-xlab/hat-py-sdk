@@ -85,10 +85,9 @@ class HatClient(utils.SessionMixin):
             *endpoints: str | HatRecord,
             options: GetOpts | None = None
     ) -> HatRecords:
-        get = self._prepare_get(endpoints)
         options = None if options is None else options.dict()
         got = []
-        for endpoint in get:
+        for endpoint in self._prepare_get(endpoints):
             res = self._endpoint_request("GET", endpoint, json=options)
             got.extend(get_records(res, errors.get_error))
         return got
