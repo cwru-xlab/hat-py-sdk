@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import itertools
 import re
+import uuid
 from typing import Callable, Iterable, Sequence
 
 from requests import Response
@@ -16,7 +17,8 @@ HatRecords = list[HatRecord]
 IHatRecords = Iterable[HatRecord]
 
 
-def group_by_endpoint(records: IHatRecords) -> Iterable[tuple[str, HatRecords]]:
+def group_by_endpoint(
+        records: IHatRecords) -> Iterable[tuple[str, IHatRecords]]:
     by_endpoint = functools.partial(lambda r: r.endpoint)
     return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
 
@@ -92,10 +94,9 @@ class HatClient(utils.SessionMixin):
         return got
 
     @requires_namespace
-    def post(self, *records: HatRecord) -> HatRecords:
-        post = self._prepare_post(records)
+    def post(self, *records: HatRecord, unique: bool = False) -> HatRecords:
         posted = []
-        for endpoint, records in post:
+        for endpoint, records in self._prepare_post(records, unique):
             res = self._endpoint_request("POST", endpoint, json=records)
             posted.extend(get_records(res, errors.post_error))
         return posted
@@ -129,9 +130,13 @@ class HatClient(utils.SessionMixin):
             for rec in require_endpoint(records)]
 
     def _prepare_post(
-            self, records: IHatRecords) -> Iterable[tuple[str, HatRecords]]:
+            self,
+            records: IHatRecords,
+            unique: bool
+    ) -> Iterable[tuple[str, list]]:
         pattern = self._pattern
         prepared = []
+        # Step 1: Ensure endpoints are present and formatted.
         for rec in require_endpoint(records):
             # The namespace is added when constructing the endpoint URL,
             # so it should not be a part of the endpoint here.
@@ -139,7 +144,13 @@ class HatClient(utils.SessionMixin):
                 endpoint = pattern.split(rec.endpoint)[-1]
                 rec = HatRecord.copy(rec, update={"endpoint": endpoint})
             prepared.append(rec)
-        return group_by_endpoint(prepared)
+        # Step 2: Group by endpoint and make unique, if necessary.
+        for endpoint, records in group_by_endpoint(prepared):
+            records = [rec.dict()["data"] for rec in records]
+            if unique:
+                for rec in records:
+                    rec["uuid"] = str(uuid.uuid4())
+            yield endpoint, records
 
     def _prepare_put(self, records: IHatRecords) -> list[dict]:
         ns, pattern = self.namespace, self._pattern
