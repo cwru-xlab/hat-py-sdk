@@ -9,13 +9,10 @@ from cachecontrol import heuristics
 from requests import Response
 
 JSON_MIMETYPE = "application/json"
+TOKEN_KEY = "x-auth-token"
 
 OnSuccess = Callable[[Response], Any]
 OnError = Callable[[int, Any], Type[Exception]]
-
-
-def token_header(token: str) -> dict:
-    return {"Content-Type": JSON_MIMETYPE, "x-auth-token": token}
 
 
 def get_json(response: Response, on_error: OnError) -> dict | list:
@@ -45,7 +42,8 @@ class SessionMixin(contextlib.AbstractContextManager):
             self,
             session: requests.Session | None = None,
             cache: bool = True,
-            stream: bool = True):
+            stream: bool = True,
+            content_type: str | None = JSON_MIMETYPE):
         super().__init__()
         if session is None:
             session = requests.Session()
@@ -53,6 +51,8 @@ class SessionMixin(contextlib.AbstractContextManager):
             if cache:
                 session = cachecontrol.CacheControl(
                     session, heuristic=heuristics.OneDayCache())
+        if content_type:
+            session.headers["Content-Type"] = content_type
         self._session = session
 
     def __enter__(self):
@@ -72,3 +72,9 @@ _never_cache_adapter.cacheable_methods = {}
 def never_cache(url: str, session: requests.Session) -> str:
     session.mount(url, _never_cache_adapter)
     return url
+
+
+def to_string(cls: Any, **kwargs) -> str:
+    name = cls.__class__.__name__
+    attrs = ", ".join(f"{k}={v}" for k, v in kwargs.items())
+    return f"{name}({attrs})"

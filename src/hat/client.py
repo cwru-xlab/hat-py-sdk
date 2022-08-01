@@ -7,7 +7,7 @@ from typing import Callable, Iterable, Sequence
 
 from requests import Response
 
-from . import errors, urls, utils
+from . import errors, tokens, urls, utils
 from .models import GetOpts, HatRecord
 from .tokens import Token
 from .utils import OnError
@@ -55,7 +55,7 @@ def requires_namespace(method: Callable) -> Callable:
 
 
 class HatClient(utils.SessionMixin):
-    __slots__ = "_token", "_namespace", "_pattern"
+    __slots__ = "_token", "_auth", "_namespace", "_pattern"
 
     def __init__(
             self,
@@ -65,6 +65,7 @@ class HatClient(utils.SessionMixin):
             **kwargs):
         super().__init__(token._session if share_session else None, **kwargs)
         self._token = token
+        self._auth = tokens.TokenAuth(token)
         self._namespace = namespace
         self._pattern = re.compile(rf"^{namespace}/")
 
@@ -84,38 +85,42 @@ class HatClient(utils.SessionMixin):
     ) -> HatRecords:
         get = self._prepare_get(endpoints)
         options = None if options is None else options.dict()
-        headers = self._auth_header()
         got = []
         for endpoint in get:
-            response = self._session.get(
-                url=self._endpoint_url(endpoint), headers=headers, json=options)
-            got.extend(get_records(response, errors.get_error))
+            res = self._endpoint_request("GET", endpoint, json=options)
+            got.extend(get_records(res, errors.get_error))
         return got
 
     @requires_namespace
     def post(self, *records: HatRecord) -> HatRecords:
         post = self._prepare_post(records)
-        headers = self._auth_header()
         posted = []
         for endpoint, records in group_by_endpoint(records):
-            response = self._session.post(
-                url=self._endpoint_url(endpoint), headers=headers, json=post)
-            posted.extend(get_records(response, errors.post_error))
+            res = self._endpoint_request("POST", endpoint, json=post)
+            posted.extend(get_records(res, errors.post_error))
         return posted
 
     def put(self, *records: HatRecord) -> HatRecords:
         put = self._prepare_put(records)
-        response = self._session.put(
-            url=self._data_url(), headers=self._auth_header(), json=put)
-        return get_records(response, errors.put_error)
+        res = self._data_request("PUT", json=put)
+        return get_records(res, errors.put_error)
 
     def delete(self, *records: str | HatRecord) -> None:
         delete = self._prepare_delete(records)
-        response = self._session.delete(
-            url=self._data_url(),
-            headers=self._auth_header(),
-            params={"records": delete})
-        get_records(response, errors.delete_error)
+        res = self._data_request("DELETE", params=delete)
+        get_records(res, errors.delete_error)
+
+    def _endpoint_request(
+            self, method: str, endpoint: str, **kwargs) -> Response:
+        url = urls.domain_endpoint(self.token.domain, self.namespace, endpoint)
+        return self._request(method, url=url, **kwargs)
+
+    def _data_request(self, method: str, **kwargs) -> Response:
+        url = urls.domain_data(self.token.domain)
+        return self._request(method, url=url, **kwargs)
+
+    def _request(self, method: str, **kwargs) -> Response:
+        return self._session.request(method, auth=self._auth, **kwargs)
 
     @staticmethod
     def _prepare_get(records: Iterable[str | HatRecord]) -> list[str]:
@@ -148,16 +153,12 @@ class HatClient(utils.SessionMixin):
         return prepared
 
     @staticmethod
-    def _prepare_delete(records: Iterable[str | HatRecord]) -> list[str]:
-        return [
+    def _prepare_delete(records: Iterable[str | HatRecord]) -> dict[str, list]:
+        records = [
             rec if isinstance(rec, str) else rec.record_id
             for rec in require_record_id(records)]
+        return {"records": records}
 
-    def _auth_header(self) -> dict[str, str]:
-        return utils.token_header(self.token.value)
-
-    def _data_url(self) -> str:
-        return urls.domain_data(self.token.domain)
-
-    def _endpoint_url(self, endpoint: str) -> str:
-        return urls.domain_endpoint(self.token.domain, self.namespace, endpoint)
+    def __repr__(self) -> str:
+        return utils.to_string(
+            self, token=self._token, namespace=self._namespace)

@@ -35,12 +35,12 @@ def domain_owner_token(domain: str) -> str:
     return with_scheme(f"{domain}/users/access_token")
 
 
-def username_app_token(username: str, appname: str) -> str:
-    return domain_app_token(hat_domain(username), appname)
+def username_app_token(username: str, app_id: str) -> str:
+    return domain_app_token(hat_domain(username), app_id)
 
 
-def domain_app_token(domain: str, appname: str) -> str:
-    return f"{domain_api(domain)}/applications/{appname}/access-token"
+def domain_app_token(domain: str, app_id: str) -> str:
+    return f"{domain_api(domain)}/applications/{app_id}/access-token"
 
 
 def username_api(username: str) -> str:

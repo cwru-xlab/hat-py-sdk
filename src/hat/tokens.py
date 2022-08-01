@@ -8,6 +8,7 @@ from typing import Optional
 import jwt
 from keyring.credentials import Credential
 from pydantic import PositiveInt, StrictStr, constr
+from requests import PreparedRequest, Response, auth
 
 from . import errors, models, urls, utils
 
@@ -25,11 +26,11 @@ class JwtToken(models.HatModel):
             encoded: str,
             *,
             pk: str | None = None,
-            verify_sig: bool = False,
+            verify: bool = False,
             as_token: bool = False
     ) -> dict | JwtToken:
-        if verify_sig and pk is None:
-            raise ValueError("'pk' is required if 'verify_sig' is True")
+        if verify and pk is None:
+            raise ValueError("'pk' is required if 'verify' is True")
         if JWT_PATTERN.match(encoded) is None:
             raise ValueError(f"'encoded' has improper syntax:\n{encoded}")
         try:
@@ -37,7 +38,7 @@ class JwtToken(models.HatModel):
                 jwt=encoded,
                 key=pk,
                 algorithms=["RS256"],
-                options={"verify_signature": verify_sig})
+                options={"verify_signature": verify})
         except jwt.InvalidTokenError as e:
             raise errors.AuthError(e)
         return payload if not as_token else JwtToken(**payload)
@@ -54,7 +55,7 @@ class JwtOwnerToken(JwtToken):
 
 class JwtAppToken(JwtToken):
     application: StrictStr
-    application_version: constr(regex=r"^\d+.\d+.\d+\$", strict=True)
+    application_version: constr(regex=r"^\d+.\d+.\d+$", strict=True)
 
     @classmethod
     def decode(cls, encoded: str, **kwargs) -> JwtAppToken:
@@ -63,7 +64,7 @@ class JwtAppToken(JwtToken):
 
 
 class Token(utils.SessionMixin, abc.ABC):
-    __slots__ = "_value", "_decoded", "_pk", "_ttl", "_expires_at"
+    __slots__ = "_value", "_decoded", "_pk", "_ttl", "_domain", "_expires"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -71,14 +72,15 @@ class Token(utils.SessionMixin, abc.ABC):
         self._decoded: Optional[JwtToken] = None
         self._pk: Optional[str] = None
         self._ttl = datetime.timedelta(days=3)
-        self._expires_at = datetime.datetime.max
+        self._domain: Optional[str] = None
+        self._expires = datetime.datetime.max
 
     @property
     def pk(self) -> str:
         if self._pk is None:
             url = urls.domain_public_key(self.domain)
-            resp = self._session.get(url)
-            self._pk = utils.get_string(resp, errors.auth_error)
+            res = self._session.get(url)
+            self._pk = utils.get_string(res, errors.auth_error)
         return self._pk
 
     @property
@@ -87,40 +89,49 @@ class Token(utils.SessionMixin, abc.ABC):
             self.refresh()
         return self._value
 
+    @value.setter
+    def value(self, val: str) -> None:
+        if self._value != val:
+            self._value = val
+            self._decoded = self._decode(verify=True)
+            self._expires = self._compute_expiration()
+
     @property
-    @abc.abstractmethod
     def domain(self) -> str:
-        pass
+        if self._domain is None:
+            token = self._decode(verify=False)
+            self._domain = urls.with_scheme(token.iss)
+        return self._domain
+
+    @property
+    def expired(self) -> bool:
+        return self._expires <= datetime.datetime.utcnow()
 
     @abc.abstractmethod
     def refresh(self) -> None:
         pass
 
-    @property
-    def expired(self) -> bool:
-        return self._expires_at <= datetime.datetime.utcnow()
+    @abc.abstractmethod
+    def _decode(self, *, verify: bool = True) -> JwtToken:
+        pass
 
     def _compute_expiration(self) -> datetime.datetime:
-        if self._decoded is None:
-            self.refresh()
         iat = datetime.datetime.utcfromtimestamp(float(self._decoded.iat))
         exp = datetime.datetime.utcfromtimestamp(float(self._decoded.exp))
         return min(iat + self._ttl, exp)
 
+    def __repr__(self) -> str:
+        return utils.to_string(self, domain=self._domain, expires=self._expires)
+
 
 class OwnerToken(Token, abc.ABC):
-    __slots__ = "_domain"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._domain: Optional[str] = None
 
-    @property
-    def domain(self) -> str:
-        if self._domain is None:
-            token = JwtOwnerToken.decode(self.value, verify_sig=False)
-            self._domain = urls.with_scheme(token.iss)
-        return self._domain
+    def _decode(self, *, verify: bool = True) -> JwtToken:
+        return JwtOwnerToken.decode(
+            self.value, pk=self.pk if verify else None, verify=verify)
 
 
 class ApiOwnerToken(OwnerToken):
@@ -131,35 +142,29 @@ class ApiOwnerToken(OwnerToken):
         self._credential = credential
 
     def refresh(self) -> None:
-        username = self.credential.username
+        username = self._credential.username
         url = urls.username_owner_token(username)
-        resp = self._session.get(
+        res = self._session.get(
             url=utils.never_cache(url, self._session),
             headers={
                 "Accept": utils.JSON_MIMETYPE,
                 "username": username,
-                "password": self.credential.password})
-        self._value = utils.get_json(resp, errors.auth_error)["accessToken"]
-        self._decoded = JwtOwnerToken.decode(
-            self._value, pk=self.pk, verify_sig=True)
-        self._expires_at = self._compute_expiration()
-
-    @property
-    def credential(self) -> Credential:
-        return self._credential
+                "password": self._credential.password})
+        self.value = utils.get_json(res, errors.auth_error)["accessToken"]
 
 
 class AppToken(Token):
-    __slots__ = "_owner_token", "_appname"
+    __slots__ = "_owner_token", "_auth", "_app_id"
 
     def __init__(
             self,
             owner_token: OwnerToken,
-            appname: str,
+            app_id: str,
             **kwargs):
         super().__init__(**kwargs)
         self._owner_token = owner_token
-        self._appname = appname
+        self._auth = TokenAuth(owner_token)
+        self._app_id = app_id
 
     @property
     def domain(self) -> str:
@@ -167,18 +172,14 @@ class AppToken(Token):
         return self._owner_token.domain
 
     def refresh(self) -> None:
-        url = urls.domain_app_token(self.domain, self.appname)
-        resp = self._session.get(
-            url=utils.never_cache(url, self._session),
-            headers=utils.token_header(self._owner_token.value))
-        self._value = utils.get_json(resp, errors.auth_error)["accessToken"]
-        self._decoded = JwtAppToken.decode(
-            self._value, pk=self.pk, verify_sig=True)
-        self._expires_at = self._compute_expiration()
+        url = urls.domain_app_token(self.domain, self._app_id)
+        res = self._session.get(
+            url=utils.never_cache(url, self._session), auth=self._auth)
+        self.value = utils.get_json(res, errors.auth_error)["accessToken"]
 
-    @property
-    def appname(self) -> str:
-        return self._appname
+    def _decode(self, *, verify: bool = True) -> JwtToken:
+        return JwtAppToken.decode(
+            self.value, pk=self.pk if verify else None, verify=verify)
 
 
 class WebOwnerToken(OwnerToken):  # TODO
@@ -188,3 +189,23 @@ class WebOwnerToken(OwnerToken):  # TODO
 
     def refresh(self) -> None:
         pass
+
+
+class TokenAuth(auth.AuthBase):
+    __slots__ = "_token"
+
+    def __init__(self, token: Token):
+        self._token = token
+
+    def __call__(self, request: PreparedRequest) -> PreparedRequest:
+        request.headers[utils.TOKEN_KEY] = self._token.value
+        request.hooks["response"].append(self._on_response)
+        return request
+
+    def _on_response(self, response: Response, **kwargs) -> Response:
+        if utils.TOKEN_KEY in response.headers:
+            self._token.value = response.headers[utils.TOKEN_KEY]
+        return response
+
+    def __repr__(self) -> str:
+        return utils.to_string(self, token=self._token)
