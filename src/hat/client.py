@@ -135,7 +135,7 @@ class HatClient(utils.SessionMixin):
             unique: bool
     ) -> Iterable[tuple[str, list]]:
         pattern = self._pattern
-        prepared = []
+        formatted = []
         # Step 1: Ensure endpoints are present and formatted.
         for rec in require_endpoint(records):
             # The namespace is added when constructing the endpoint URL,
@@ -143,9 +143,9 @@ class HatClient(utils.SessionMixin):
             if pattern.match(rec.endpoint):
                 endpoint = pattern.split(rec.endpoint)[-1]
                 rec = HatRecord.copy(rec, update={"endpoint": endpoint})
-            prepared.append(rec)
+            formatted.append(rec)
         # Step 2: Group by endpoint and make unique, if necessary.
-        for endpoint, records in group_by_endpoint(prepared):
+        for endpoint, records in group_by_endpoint(formatted):
             records = [rec.dict()["data"] for rec in records]
             if unique:
                 for rec in records:
