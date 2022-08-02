@@ -135,21 +135,19 @@ class OwnerToken(Token, abc.ABC):
 
 
 class ApiOwnerToken(OwnerToken):
-    __slots__ = "_credential"
+    __slots__ = "_url", "_auth"
 
     def __init__(self, credential: Credential, **kwargs):
         super().__init__(**kwargs)
-        self._credential = credential
+        self._url = self._get_url(credential)
+        self._auth = CredentialAuth(credential)
+
+    def _get_url(self, credential: Credential) -> str:
+        url = urls.username_owner_token(credential.username)
+        return utils.never_cache(url, self._session)
 
     def refresh(self) -> None:
-        username = self._credential.username
-        url = urls.username_owner_token(username)
-        res = self._session.get(
-            url=utils.never_cache(url, self._session),
-            headers={
-                "Accept": utils.JSON_MIMETYPE,
-                "username": username,
-                "password": self._credential.password})
+        res = self._session.get(url=self._url, auth=self._auth)
         self.value = utils.get_json(res, errors.auth_error)["accessToken"]
 
 
@@ -189,6 +187,19 @@ class WebOwnerToken(OwnerToken):  # TODO
 
     def refresh(self) -> None:
         pass
+
+
+class CredentialAuth(auth.AuthBase):
+    __slots__ = "_credential",
+
+    def __init__(self, credential: Credential):
+        self._credential = credential
+
+    def __call__(self, request: PreparedRequest) -> PreparedRequest:
+        request.headers["Accept"] = utils.JSON_MIMETYPE
+        request.headers["username"] = self._credential.username
+        request.headers["password"] = self._credential.password
+        return request
 
 
 class TokenAuth(auth.AuthBase):
