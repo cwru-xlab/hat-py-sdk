@@ -107,8 +107,18 @@ class Token(utils.SessionMixin, abc.ABC):
     def expired(self) -> bool:
         return self._expires <= datetime.datetime.utcnow()
 
-    @abc.abstractmethod
     def refresh(self) -> None:
+        res = self._session.get(url=self.url, auth=self.auth)
+        self.value = utils.get_json(res, errors.auth_error)["accessToken"]
+
+    @property
+    @abc.abstractmethod
+    def url(self) -> str:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def auth(self) -> auth.AuthBase:
         pass
 
     @abc.abstractmethod
@@ -125,6 +135,7 @@ class Token(utils.SessionMixin, abc.ABC):
 
 
 class OwnerToken(Token, abc.ABC):
+    __slots__ = ()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -146,13 +157,17 @@ class ApiOwnerToken(OwnerToken):
         url = urls.username_owner_token(credential.username)
         return utils.never_cache(url, self._session)
 
-    def refresh(self) -> None:
-        res = self._session.get(url=self._url, auth=self._auth)
-        self.value = utils.get_json(res, errors.auth_error)["accessToken"]
+    @property
+    def url(self) -> str:
+        return self._url
+
+    @property
+    def auth(self) -> auth.AuthBase:
+        return self._auth
 
 
 class AppToken(Token):
-    __slots__ = "_owner_token", "_auth", "_app_id"
+    __slots__ = "_owner_token", "_auth", "_app_id", "_url"
 
     def __init__(
             self,
@@ -163,24 +178,30 @@ class AppToken(Token):
         self._owner_token = owner_token
         self._auth = TokenAuth(owner_token)
         self._app_id = app_id
+        self._url: Optional[str] = None
 
     @property
     def domain(self) -> str:
         # Must defer to owner token to avoid infinite recursion.
         return self._owner_token.domain
 
-    def refresh(self) -> None:
-        url = urls.domain_app_token(self.domain, self._app_id)
-        res = self._session.get(
-            url=utils.never_cache(url, self._session), auth=self._auth)
-        self.value = utils.get_json(res, errors.auth_error)["accessToken"]
+    @property
+    def url(self) -> str:
+        if self._url is None:
+            url = urls.domain_app_token(self.domain, self._app_id)
+            self._url = utils.never_cache(url, self._session)
+        return self._url
+
+    @property
+    def auth(self) -> auth.AuthBase:
+        return self._auth
 
     def _decode(self, *, verify: bool = True) -> JwtToken:
         return JwtAppToken.decode(
             self.value, pk=self.pk if verify else None, verify=verify)
 
 
-class WebOwnerToken(OwnerToken):  # TODO
+class WebOwnerToken(OwnerToken, abc.ABC):  # TODO
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
