@@ -79,8 +79,8 @@ class Token(utils.SessionMixin, abc.ABC):
     def pk(self) -> str:
         if self._pk is None:
             url = urls.domain_public_key(self.domain)
-            res = self._session.get(url)
-            self._pk = utils.get_string(res, errors.auth_error)
+            response = self._session.get(url)
+            self._pk = utils.get_string(response, errors.auth_error)
         return self._pk
 
     @property
@@ -108,8 +108,8 @@ class Token(utils.SessionMixin, abc.ABC):
         return self._expires <= datetime.datetime.utcnow()
 
     def refresh(self) -> None:
-        res = self._session.get(url=self.url, auth=self.auth)
-        self.value = utils.get_json(res, errors.auth_error)["accessToken"]
+        response = self._session.get(url=self.url, auth=self.auth)
+        self.value = utils.get_json(response, errors.auth_error)["accessToken"]
 
     @property
     @abc.abstractmethod
