@@ -79,14 +79,15 @@ class Token(utils.SessionMixin, abc.ABC):
     def pk(self) -> str:
         if self._pk is None:
             url = urls.domain_public_key(self.domain)
-            response = self._session.get(url)
-            self._pk = utils.get_string(response, errors.auth_error)
+            res = self._session.get(url)
+            self._pk = utils.get_string(res, errors.auth_error)
         return self._pk
 
     @property
     def value(self) -> str:
         if self._value is None or self.expired:
-            self.refresh()
+            res = self._session.get(url=self.url, auth=self.auth)
+            self.value = utils.get_json(res, errors.auth_error)["accessToken"]
         return self._value
 
     @value.setter
@@ -107,10 +108,6 @@ class Token(utils.SessionMixin, abc.ABC):
     def expired(self) -> bool:
         return self._expires <= datetime.datetime.utcnow()
 
-    def refresh(self) -> None:
-        response = self._session.get(url=self.url, auth=self.auth)
-        self.value = utils.get_json(response, errors.auth_error)["accessToken"]
-
     @property
     @abc.abstractmethod
     def url(self) -> str:
@@ -118,7 +115,7 @@ class Token(utils.SessionMixin, abc.ABC):
 
     @property
     @abc.abstractmethod
-    def auth(self) -> auth.AuthBase:
+    def auth(self) -> Optional[auth.AuthBase]:
         pass
 
     @abc.abstractmethod
@@ -206,9 +203,6 @@ class WebOwnerToken(OwnerToken, abc.ABC):  # TODO
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def refresh(self) -> None:
-        pass
-
 
 class CredentialAuth(auth.AuthBase):
     __slots__ = "_credential",
@@ -216,11 +210,11 @@ class CredentialAuth(auth.AuthBase):
     def __init__(self, credential: Credential):
         self._credential = credential
 
-    def __call__(self, request: PreparedRequest) -> PreparedRequest:
-        request.headers["Accept"] = utils.JSON_MIMETYPE
-        request.headers["username"] = self._credential.username
-        request.headers["password"] = self._credential.password
-        return request
+    def __call__(self, req: PreparedRequest) -> PreparedRequest:
+        req.headers["Accept"] = utils.JSON_MIMETYPE
+        req.headers["username"] = self._credential.username
+        req.headers["password"] = self._credential.password
+        return req
 
 
 class TokenAuth(auth.AuthBase):
@@ -234,10 +228,10 @@ class TokenAuth(auth.AuthBase):
         request.hooks["response"].append(self._on_response)
         return request
 
-    def _on_response(self, response: Response, **kwargs) -> Response:
-        if utils.TOKEN_KEY in response.headers:
-            self._token.value = response.headers[utils.TOKEN_KEY]
-        return response
+    def _on_response(self, res: Response, **kwargs) -> Response:
+        if utils.TOKEN_KEY in res.headers:
+            self._token.value = res.headers[utils.TOKEN_KEY]
+        return res
 
     def __repr__(self) -> str:
         return utils.to_string(self, token=self._token)

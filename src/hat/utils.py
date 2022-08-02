@@ -15,24 +15,23 @@ OnSuccess = Callable[[Response], Any]
 OnError = Callable[[int, Any], Type[Exception]]
 
 
-def get_json(response: Response, on_error: OnError) -> dict | list:
-    return _handle_response(response, lambda r: r.json(), on_error)
+def get_json(res: Response, on_error: OnError) -> dict | list:
+    return _handle(res, lambda r: r.json(), on_error)
 
 
-def get_string(response: Response, on_error: OnError) -> str:
-    return _handle_response(response, lambda r: r.text, on_error)
+def get_string(res: Response, on_error: OnError) -> str:
+    return _handle(res, lambda r: r.text, on_error)
 
 
-def _handle_response(
-        response: Response, on_success: OnSuccess, on_error: OnError) -> Any:
+def _handle(res: Response, on_success: OnSuccess, on_error: OnError) -> Any:
     try:
-        response.raise_for_status()
-        return on_success(response)
+        res.raise_for_status()
+        return on_success(res)
     except requests.RequestException as e:
-        error = on_error(response.status_code, response.json())
+        error = on_error(res.status_code, res.json())
         raise error(e)
     finally:
-        response.close()  # Required for efficiency when streaming.
+        res.close()  # Required for efficiency when streaming.
 
 
 class SessionMixin(contextlib.AbstractContextManager):

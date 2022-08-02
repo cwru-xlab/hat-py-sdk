@@ -23,8 +23,8 @@ def group_by_endpoint(
     return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
 
 
-def get_records(response: Response, on_error: OnError) -> HatRecords:
-    content = utils.get_json(response, on_error)
+def get_records(res: Response, on_error: OnError) -> HatRecords:
+    content = utils.get_json(res, on_error)
     if isinstance(content, Sequence):
         records = [HatRecord(**record) for record in content]
     else:
@@ -88,27 +88,27 @@ class HatClient(utils.SessionMixin):
         options = None if options is None else options.dict()
         got = []
         for endpoint in self._prepare_get(endpoints):
-            response = self._endpoint_request("GET", endpoint, json=options)
-            got.extend(get_records(response, errors.get_error))
+            res = self._endpoint_request("GET", endpoint, json=options)
+            got.extend(get_records(res, errors.get_error))
         return got
 
     @requires_namespace
     def post(self, *records: HatRecord, unique: bool = False) -> HatRecords:
         posted = []
         for endpoint, records in self._prepare_post(records, unique):
-            response = self._endpoint_request("POST", endpoint, json=records)
-            posted.extend(get_records(response, errors.post_error))
+            res = self._endpoint_request("POST", endpoint, json=records)
+            posted.extend(get_records(res, errors.post_error))
         return posted
 
     def put(self, *records: HatRecord) -> HatRecords:
         put = self._prepare_put(records)
-        response = self._data_request("PUT", json=put)
-        return get_records(response, errors.put_error)
+        res = self._data_request("PUT", json=put)
+        return get_records(res, errors.put_error)
 
     def delete(self, *records: str | HatRecord) -> None:
         delete = self._prepare_delete(records)
-        response = self._data_request("DELETE", params=delete)
-        get_records(response, errors.delete_error)
+        res = self._data_request("DELETE", params=delete)
+        get_records(res, errors.delete_error)
 
     def _endpoint_request(
             self, method: str, endpoint: str, **kwargs) -> Response:
