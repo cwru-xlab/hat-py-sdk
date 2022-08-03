@@ -56,9 +56,9 @@ def requires_namespace(method: Callable) -> Callable:
     return wrapper
 
 
-def _uniquify(*records: HatRecord, only_data: bool) -> dict | list[dict]:
+def _uniquify(*records: dict, only_data: bool) -> dict | list[dict]:
     unique = []
-    for rec in (rec.dict() for rec in records):
+    for rec in records:
         if not isinstance(rec["data"], dict):
             rec["data"] = {"data": rec["data"]}
         rec["data"]["ulid"] = str(ulid.new())
@@ -180,7 +180,11 @@ class HatClient(utils.SessionMixin):
             formatted.append(rec)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, records in group_by_endpoint(formatted):
-            records = _uniquify(*records, only_data=True) if unique else records
+            records = (rec.dict() for rec in records)
+            if unique:
+                records = _uniquify(*records, only_data=True)
+            else:
+                records = [rec["data"] for rec in records]
             yield endpoint, records
 
     def _prepare_put(self, records: IHatRecords, unique: bool) -> list[dict]:
@@ -191,9 +195,8 @@ class HatClient(utils.SessionMixin):
             # from responses will include the namespace. This is just a
             # convenience if wanting to create HatRecords manually.
             if pattern.match(e := rec.endpoint) is None:
-                rec = HatRecord.copy(rec, update={"endpoint": f"{ns}/{e}"})
-            rec = _uniquify(rec, only_data=False) if unique else rec.dict()
-            prepared.append(rec)
+                rec = rec.copy(update={"endpoint": f"{ns}/{e}"}).dict()
+            prepared.append(_uniquify(rec, only_data=False) if unique else rec)
         return prepared
 
     @staticmethod
