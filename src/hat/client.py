@@ -3,9 +3,9 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-import uuid
-from typing import Callable, Iterable, Sequence
+from typing import Callable, Iterable, Optional, Sequence
 
+import ulid
 from requests import Response
 
 from . import errors, tokens, urls, utils
@@ -56,52 +56,87 @@ def requires_namespace(method: Callable) -> Callable:
     return wrapper
 
 
+def _uniquify(*records: HatRecord, only_data: bool) -> dict | list[dict]:
+    unique = []
+    for rec in (rec.dict() for rec in records):
+        if not isinstance(rec["data"], dict):
+            rec["data"] = {"data": rec["data"]}
+        rec["data"]["ulid"] = str(ulid.new())
+        if only_data:
+            unique.append(rec["data"])
+        else:
+            unique.append(rec)
+    return unique if len(unique) > 1 else unique[0]
+
+
 class HatClient(utils.SessionMixin):
-    __slots__ = "_token", "_auth", "_namespace", "_pattern"
+    __slots__ = "_uniquify", "_token", "_auth", "_namespace", "_pattern"
 
     def __init__(
             self,
             token: Token,
-            namespace: str | None = None,
+            namespace: Optional[str] = None,
             share_session: bool = True,
+            uniquify: bool = False,
             **kwargs):
         super().__init__(token._session if share_session else None, **kwargs)
         self._token = token
         self._auth = tokens.TokenAuth(token)
         self._namespace = namespace
         self._pattern = re.compile(rf"^{namespace}/")
+        self._uniquify = uniquify
 
     @property
-    def namespace(self) -> str | None:
+    def namespace(self) -> Optional[str]:
         return self._namespace
 
     @property
     def token(self) -> Token:
         return self._token
 
+    @property
+    def uniquify(self) -> bool:
+        return self._uniquify
+
     @requires_namespace
     def get(
             self,
             *endpoints: str | HatRecord,
-            options: GetOpts | None = None
+            options: Optional[GetOpts] = None,
     ) -> HatRecords:
         options = None if options is None else options.dict()
         got = []
         for endpoint in self._prepare_get(endpoints):
             res = self._endpoint_request("GET", endpoint, json=options)
             got.extend(get_records(res, errors.get_error))
+        got = [
+            # Unwrap the nesting from record-data uniquification.
+            HatRecord.copy(rec, update={"data": rec.data["data"]})
+            if isinstance(rec.data, dict) and "data" in rec.data
+            else rec
+            for rec in got]
         return got
 
     @requires_namespace
-    def post(self, *records: HatRecord, unique: bool = False) -> HatRecords:
+    def post(
+            self,
+            *records: HatRecord,
+            uniquify: Optional[bool] = None
+    ) -> HatRecords:
+        uniquify = self._uniquify if uniquify is None else uniquify
         posted = []
-        for endpoint, records in self._prepare_post(records, unique):
+        for endpoint, records in self._prepare_post(records, uniquify):
             res = self._endpoint_request("POST", endpoint, json=records)
             posted.extend(get_records(res, errors.post_error))
         return posted
 
-    def put(self, *records: HatRecord) -> HatRecords:
-        put = self._prepare_put(records)
+    def put(
+            self,
+            *records: HatRecord,
+            uniquify: Optional[bool] = None
+    ) -> HatRecords:
+        uniquify = self._uniquify if uniquify is None else uniquify
+        put = self._prepare_put(records, uniquify)
         res = self._data_request("PUT", json=put)
         return get_records(res, errors.put_error)
 
@@ -145,13 +180,10 @@ class HatClient(utils.SessionMixin):
             formatted.append(rec)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, records in group_by_endpoint(formatted):
-            records = [rec.dict()["data"] for rec in records]
-            if unique:
-                for rec in records:
-                    rec["uuid"] = str(uuid.uuid4())
+            records = _uniquify(*records, only_data=True) if unique else records
             yield endpoint, records
 
-    def _prepare_put(self, records: IHatRecords) -> list[dict]:
+    def _prepare_put(self, records: IHatRecords, unique: bool) -> list[dict]:
         ns, pattern = self.namespace, self._pattern
         prepared = []
         for rec in require_endpoint(records):
@@ -160,7 +192,8 @@ class HatClient(utils.SessionMixin):
             # convenience if wanting to create HatRecords manually.
             if pattern.match(e := rec.endpoint) is None:
                 rec = HatRecord.copy(rec, update={"endpoint": f"{ns}/{e}"})
-            prepared.append(rec.dict())
+            rec = _uniquify(rec, only_data=False) if unique else rec.dict()
+            prepared.append(rec)
         return prepared
 
     @staticmethod
