@@ -28,10 +28,6 @@ class PostError(HatError):
     pass
 
 
-class DuplicateDataError(PostError):
-    pass
-
-
 class PutError(HatError):
     pass
 
@@ -41,6 +37,12 @@ class MissingPathError(PutError):
 
 
 class MalformedBodyError(PutError):
+    pass
+
+
+# It is not officially documented, but it appears that updating (PUT) a record
+# to have the same data as another existing record is also not allowed.
+class DuplicateDataError(PostError, PutError):
     pass
 
 
@@ -125,6 +127,7 @@ post_errors.put(400, DuplicateDataError)
 put_errors = ErrorMapping(PutError)
 put_errors.update(crud_errors)
 put_errors.put(400, resolver=resolve_put_400)
+put_errors.put(500, DuplicateDataError)
 
 delete_errors = ErrorMapping(DeleteError)
 delete_errors.update(crud_errors)
