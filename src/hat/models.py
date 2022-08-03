@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Generic, Optional, TypeVar
 
 from humps import camel
-from pydantic import BaseModel, Field, NonNegativeInt, conint, constr
+from pydantic import BaseModel, NonNegativeInt, conint, constr
 from pydantic.generics import GenericModel
 
 T = TypeVar("T")
@@ -23,7 +23,7 @@ class HatModel(BaseModel, ABC):
 class HatRecord(HatModel, GenericModel, Generic[T]):
     endpoint: Optional[StrictStr]
     record_id: Optional[StrictStr]
-    data: Optional[T] = Field(default_factory=dict)
+    data: T = {}
 
     def dict(self, by_alias: bool = True, **kwargs) -> dict:
         return super().dict(by_alias=by_alias, **kwargs)
