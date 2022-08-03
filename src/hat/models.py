@@ -1,31 +1,58 @@
 from __future__ import annotations
 
-from abc import ABC
+import abc
 from enum import Enum
-from typing import Generic, Optional, TypeVar
+from typing import Any, Optional, TypeVar
 
+import pydantic
+import ulid
 from humps import camel
-from pydantic import BaseModel, NonNegativeInt, conint, constr
-from pydantic.generics import GenericModel
+from pydantic import BaseModel, Field, NonNegativeInt, conint, constr
 
 T = TypeVar("T")
 StrictStr = constr(strict=True)  # Plays nicely with type checking
 
 
-class HatModel(BaseModel, ABC):
+class BaseHatModel(BaseModel, abc.ABC):
+    endpoint: Optional[StrictStr]
+    record_id: Optional[StrictStr]
+
+
+class HatModel(BaseHatModel):
+    pk: StrictStr = Field(default_factory=lambda: str(ulid.new()))
+
+    class Config:
+        extra = pydantic.Extra.allow
+
+    @classmethod
+    def from_record(cls, record: HatRecord) -> HatModel:
+        return HatModel(
+            endpoint=record.endpoint, record_id=record.record_id, **record.data)
+
+    def to_record(self) -> HatRecord:
+        return HatRecord.from_model(self)
+
+
+class HatRecord(BaseHatModel):
+    data: dict[str, Any] = {}
+
     class Config:
         allow_population_by_field_name = True
         use_enum_values = True
         allow_mutation = False
         alias_generator = camel.case
 
+    @classmethod
+    def from_model(cls, model: HatModel) -> HatRecord:
+        return HatRecord(
+            endpoint=model.endpoint,
+            record_id=model.record_id,
+            data=model.dict(exclude={"endpoint", "record_id"}))
 
-class HatRecord(HatModel, GenericModel, Generic[T]):
-    endpoint: Optional[StrictStr]
-    record_id: Optional[StrictStr]
-    data: T = {}
+    def to_model(self) -> HatModel:
+        return HatModel.from_record(self)
 
-    def dict(self, by_alias: bool = True, **kwargs) -> dict:
+    def dict(self, by_alias: bool = True, **kwargs) -> dict[str, Any]:
         return super().dict(by_alias=by_alias, **kwargs)
 
     def json(self, by_alias: bool = True, **kwargs) -> str | None:
