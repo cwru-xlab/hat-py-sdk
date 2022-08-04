@@ -3,16 +3,17 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import Any, Callable, Generator, Iterable, Optional, Type, Union
+from typing import (Any, Callable, Generator, Iterable, Optional, Protocol,
+                    Type, Union)
 
 from requests import Response
 
 from . import errors, tokens, urls, utils
-from .models import BaseHatModel, GetOpts, HatRecord, M
+from .models import GetOpts, HatRecord, M
 from .tokens import Token
 from .utils import OnError
 
-StringLike = Union[str, M, HatRecord]
+StringLike = Union[str, Protocol[str]]
 IStringLike = Iterable[StringLike]
 
 
@@ -35,14 +36,14 @@ def types(objs: Iterable) -> Iterable[Type]:
 
 def require_endpoint(strings: IStringLike) -> Generator[StringLike]:
     for s in strings:
-        if isinstance(s, BaseHatModel) and s.endpoint is None:
+        if hasattr(s, "endpoint") and s.endpoint is None:
             raise ValueError("'endpoint' is required")
         yield s
 
 
 def require_record_id(strings: IStringLike) -> Generator[StringLike]:
     for s in strings:
-        if isinstance(s, BaseHatModel) and s.record_id is None:
+        if hasattr(s, "record_id") and s.record_id is None:
             raise ValueError("'record_id' is required")
         yield s
 
