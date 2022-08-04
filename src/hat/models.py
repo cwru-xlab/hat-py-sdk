@@ -1,31 +1,72 @@
 from __future__ import annotations
 
-from abc import ABC
+import abc
 from enum import Enum
-from typing import Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, Type, TypeVar
 
+import pydantic
+import ulid
 from humps import camel
-from pydantic import BaseModel, NonNegativeInt, conint, constr
+from pydantic import BaseModel, Field, NonNegativeInt, StrictStr, conint, constr
 from pydantic.generics import GenericModel
 
-T = TypeVar("T")
-StrictStr = constr(strict=True)  # Plays nicely with type checking
+
+class HatConfig(pydantic.BaseConfig):
+    allow_population_by_field_name = True
+    use_enum_values = True
+    allow_mutation = False
+    alias_generator = camel.case
 
 
-class HatModel(BaseModel, ABC):
-    class Config:
-        allow_population_by_field_name = True
-        use_enum_values = True
-        allow_mutation = False
-        alias_generator = camel.case
-
-
-class HatRecord(HatModel, GenericModel, Generic[T]):
+class BaseHatModel(BaseModel, abc.ABC):
     endpoint: Optional[StrictStr]
     record_id: Optional[StrictStr]
-    data: T = {}
 
-    def dict(self, by_alias: bool = True, **kwargs) -> dict:
+
+class HatModel(BaseHatModel):
+    pk: StrictStr = Field(default_factory=lambda: str(ulid.new()))
+
+    class Config:
+        extra = pydantic.Extra.allow
+
+    @pydantic.validator("*", pre=True)
+    def _check_nesting(cls, value: Any) -> Any:
+        if isinstance(value, BaseHatModel):
+            raise TypeError(
+                f"Nested BaseHatModel attributes is not supported. Use "
+                "pydantic.BaseModel instead.")
+        return value
+
+    @classmethod
+    def from_record(cls, record: HatRecord[M]) -> M:
+        model = cls.parse_obj(record.data)
+        model.record_id = record.record_id
+        model.endpoint = record.endpoint
+        return model
+
+    def to_record(self) -> HatRecord[M]:
+        return HatRecord.from_model(self)
+
+
+M = TypeVar("M", bound=HatModel)
+
+
+class HatRecord(BaseHatModel, GenericModel, Generic[M]):
+    data: dict[str, Any] = {}
+
+    Config = HatConfig
+
+    @classmethod
+    def from_model(cls, model: M) -> HatRecord[M]:
+        return cls(
+            endpoint=model.endpoint,
+            record_id=model.record_id,
+            data=model.dict(exclude={"endpoint", "record_id"}))
+
+    def to_model(self, model: Type[M]) -> M:
+        return model.from_record(self)
+
+    def dict(self, by_alias: bool = True, **kwargs) -> dict[str, Any]:
         return super().dict(by_alias=by_alias, **kwargs)
 
     def json(self, by_alias: bool = True, **kwargs) -> str | None:
@@ -37,11 +78,13 @@ class Ordering(str, Enum):
     DESCENDING = "descending"
 
 
-class GetOpts(HatModel):
+class GetOpts(BaseModel):
     order_by: Optional[constr(min_length=1)]
     ordering: Optional[Ordering]
     skip: Optional[NonNegativeInt]
     take: Optional[conint(ge=0, le=1000)]
+
+    Config = HatConfig
 
     def dict(self, exclude_none: bool = True, **kwargs) -> dict:
         return super().dict(exclude_none=exclude_none, **kwargs)
