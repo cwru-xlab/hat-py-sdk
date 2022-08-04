@@ -1,6 +1,6 @@
 # hat-py-sdk
 
-Python [Dataswift HAT SDK](https://api.dataswift.io/).
+Unofficial Python SDK for the [Dataswift API](https://api.dataswift.io/).
 
 ## Features
 
