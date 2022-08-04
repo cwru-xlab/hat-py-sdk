@@ -3,17 +3,16 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import (Any, Callable, Generator, Iterable, Optional, Protocol,
-                    Type, Union)
+from typing import (Any, Callable, Generator, Iterable, Optional, Type, Union)
 
 from requests import Response
 
 from . import errors, tokens, urls, utils
-from .models import GetOpts, HatRecord, M
+from .models import GetOpts, HatModel, HatRecord, M
 from .tokens import Token
 from .utils import OnError
 
-StringLike = Union[str, Protocol[str]]
+StringLike = Union[str, HatModel, HatRecord]
 IStringLike = Iterable[StringLike]
 
 
