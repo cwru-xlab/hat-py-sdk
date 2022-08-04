@@ -26,7 +26,9 @@ def get_models(res: Response, on_error: OnError, *mtypes: Type[M]) -> list[M]:
     content = utils.get_json(res, on_error)
     if not isinstance(content, list):
         content = [content]
-    return [HatRecord(**rec).to_model(m) for rec, m in zip(content, mtypes)]
+    # When more records exist than model types, try binding to the last one.
+    mtypes, m = iter(mtypes), None
+    return [HatRecord(**rec).to_model(m := next(mtypes, m)) for rec in content]
 
 
 def types(objs: Iterable) -> Iterable[Type]:
@@ -106,8 +108,8 @@ class HatClient(utils.SessionMixin):
         res = self._data_request("PUT", json=put)
         return get_models(res, errors.put_error, *types(models))
 
-    def delete(self, *endpoints: StringLike) -> None:
-        delete = self._prepare_delete(endpoints)
+    def delete(self, *record_ids: StringLike) -> None:
+        delete = self._prepare_delete(record_ids)
         res = self._data_request("DELETE", params=delete)
         utils.get_json(res, errors.delete_error)
 
@@ -153,11 +155,11 @@ class HatClient(utils.SessionMixin):
         return prepared
 
     @staticmethod
-    def _prepare_delete(endpoints: IStringLike) -> dict[str, list[str]]:
-        endpoints = [
-            e if isinstance(e, str) else e.record_id
-            for e in require_record_id(endpoints)]
-        return {"records": endpoints}
+    def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:
+        record_ids = [
+            r if isinstance(r, str) else r.record_id
+            for r in require_record_id(record_ids)]
+        return {"records": record_ids}
 
     def __repr__(self) -> str:
         return utils.to_string(
