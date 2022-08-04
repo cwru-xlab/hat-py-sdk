@@ -3,28 +3,26 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import Callable, Generator, Iterable, Optional, Type, Union
+from typing import Any, Callable, Generator, Iterable, Optional, Type, Union
 
 from requests import Response
 
 from . import errors, tokens, urls, utils
-from .models import BaseHatModel, GetOpts, HatModel, HatRecord, M
+from .models import BaseHatModel, GetOpts, HatRecord, M
 from .tokens import Token
 from .utils import OnError
 
-HatModels = list[HatModel]
-IHatModels = Iterable[HatModel]
-StringLike = Union[str, HatModel, HatRecord]
+StringLike = Union[str, M, HatRecord]
 IStringLike = Iterable[StringLike]
 
 
-def group_by_endpoint(models: IHatModels) -> Iterable[tuple[str, HatModels]]:
+def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
     by_endpoint = functools.partial(lambda r: r.endpoint)
     groups = itertools.groupby(sorted(models, key=by_endpoint), by_endpoint)
     return ((endpoint, list(models)) for endpoint, models in groups)
 
 
-def get_models(res: Response, on_error: OnError, *mtypes: Type[M]) -> HatModels:
+def get_models(res: Response, on_error: OnError, *mtypes: Type[M]) -> list[M]:
     content = utils.get_json(res, on_error)
     if not isinstance(content, list):
         content = [content]
@@ -103,7 +101,7 @@ class HatClient(utils.SessionMixin):
             posted.extend(get_models(res, errors.post_error, *mtypes))
         return posted
 
-    def put(self, *models: HatModel) -> HatModels:
+    def put(self, *models: M) -> list[M]:
         put = self._prepare_put(models)
         res = self._data_request("PUT", json=put)
         return get_models(res, errors.put_error, *types(models))
@@ -130,7 +128,7 @@ class HatClient(utils.SessionMixin):
         model = next(require_endpoint([model]))
         return model if isinstance(model, str) else model.endpoint
 
-    def _prepare_post(self, models: IHatModels) -> Iterable[tuple]:
+    def _prepare_post(self, models: Iterable[M]) -> Iterable[tuple]:
         formatted = []
         # Step 1: Ensure endpoints are present and formatted.
         for m in require_endpoint(models):
@@ -143,7 +141,7 @@ class HatClient(utils.SessionMixin):
         for endpoint, models in group_by_endpoint(formatted):
             yield endpoint, [m.to_record().data for m in models], types(models)
 
-    def _prepare_put(self, models: IHatModels) -> list[dict]:
+    def _prepare_put(self, models: Iterable[M]) -> list[dict[str, Any]]:
         prepared = []
         for m in require_endpoint(models):
             # The endpoint should include the namespace. HatRecords created
