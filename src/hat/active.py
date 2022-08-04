@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import ClassVar, Optional, Type, TypeVar, cast
+from typing import ClassVar, Optional, TypeVar
 
 from . import GetOpts, errors, models
 from .client import HatClient, StringLike
+from .models import M
 
 
 class ActiveHatModel(models.HatModel):
@@ -22,7 +23,7 @@ class ActiveHatModel(models.HatModel):
                 saved = client.post(self)
             else:
                 raise e
-        return cast(A, saved[0])
+        return saved[0]
 
     def delete(self) -> None:
         return self.client.delete(self)
@@ -30,11 +31,14 @@ class ActiveHatModel(models.HatModel):
     @classmethod
     def get(
             cls,
-            mtype: Type[A],
             endpoint: StringLike,
             options: Optional[GetOpts] = None
     ) -> list[A]:
-        return cls.client.get(mtype, endpoint, options=options)
+        return cls.client.get(cls, endpoint, options=options)
+
+    @classmethod
+    def of(cls, model: M) -> A:
+        return cls.parse_obj(model)
 
 
 A = TypeVar("A", bound=ActiveHatModel)
