@@ -5,9 +5,9 @@ description = ""
 authors = ["rtatton <rdt17@proton.me>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/cwru-xlab/hat-py-sdk"
-repository = "https://github.com/cwru-xlab/hat-py-sdk"
-keywords = ["xlab", "dataswift", "hat", "python", "sdk"]
+homepage = "https://github.com/rtatton/hat-py-sdk"
+repository = "https://github.com/rtatton/hat-py-sdk"
+keywords = ["dataswift", "hat", "python", "sdk"]
 packages = [{ include = "hat", from = "src" }]
 
 [tool.poetry.dependencies]
