@@ -3,47 +3,49 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import Callable, Iterable, Optional, Sequence
+from typing import Callable, Generator, Iterable, Optional, Type, Union
 
-import ulid
 from requests import Response
 
 from . import errors, tokens, urls, utils
-from .models import GetOpts, HatRecord
+from .models import BaseHatModel, GetOpts, HatModel, HatRecord, M
 from .tokens import Token
 from .utils import OnError
 
-HatRecords = list[HatRecord]
-IHatRecords = Iterable[HatRecord]
+HatModels = list[HatModel]
+IHatModels = Iterable[HatModel]
+StringLike = Union[str, HatModel, HatRecord]
+IStringLike = Iterable[StringLike]
 
 
-def group_by_endpoint(
-        records: IHatRecords) -> Iterable[tuple[str, IHatRecords]]:
+def group_by_endpoint(models: IHatModels) -> Iterable[tuple[str, IHatModels]]:
     by_endpoint = functools.partial(lambda r: r.endpoint)
-    return itertools.groupby(sorted(records, key=by_endpoint), by_endpoint)
+    return itertools.groupby(sorted(models, key=by_endpoint), by_endpoint)
 
 
-def get_records(res: Response, on_error: OnError) -> HatRecords:
+def get_models(res: Response, on_error: OnError, *mtypes: Type[M]) -> HatModels:
     content = utils.get_json(res, on_error)
-    if isinstance(content, Sequence):
-        records = [HatRecord(**record) for record in content]
-    else:
-        records = [HatRecord(**content)]
-    return records
+    if not isinstance(content, list):
+        content = [content]
+    return [HatRecord(**rec).to_model(m) for rec, m in zip(content, mtypes)]
 
 
-def require_endpoint(records: Iterable[str | HatRecord]) -> IHatRecords:
-    for record in records:
-        if isinstance(record, HatRecord) and record.endpoint is None:
+def types(objs: Iterable) -> Iterable[Type]:
+    return (type(o) for o in objs)
+
+
+def require_endpoint(strings: IStringLike) -> Generator[StringLike]:
+    for s in strings:
+        if isinstance(s, BaseHatModel) and s.endpoint is None:
             raise ValueError("'endpoint' is required")
-        yield record
+        yield s
 
 
-def require_record_id(records: Iterable[str | HatRecord]) -> IHatRecords:
-    for record in records:
-        if isinstance(record, HatRecord) and record.record_id is None:
+def require_record_id(strings: IStringLike) -> Generator[StringLike]:
+    for s in strings:
+        if isinstance(s, BaseHatModel) and s.record_id is None:
             raise ValueError("'record_id' is required")
-        yield record
+        yield s
 
 
 def requires_namespace(method: Callable) -> Callable:
@@ -56,35 +58,20 @@ def requires_namespace(method: Callable) -> Callable:
     return wrapper
 
 
-def _uniquify(*records: HatRecord, only_data: bool) -> dict | list[dict]:
-    unique = []
-    for rec in (rec.dict() for rec in records):
-        if not isinstance(rec["data"], dict):
-            rec["data"] = {"data": rec["data"]}
-        rec["data"]["ulid"] = str(ulid.new())
-        if only_data:
-            unique.append(rec["data"])
-        else:
-            unique.append(rec)
-    return unique if len(unique) > 1 else unique[0]
-
-
 class HatClient(utils.SessionMixin):
-    __slots__ = "_uniquify", "_token", "_auth", "_namespace", "_pattern"
+    __slots__ = "_token", "_auth", "_namespace", "_pattern"
 
     def __init__(
             self,
             token: Token,
             namespace: Optional[str] = None,
             share_session: bool = True,
-            uniquify: bool = False,
             **kwargs):
         super().__init__(token._session if share_session else None, **kwargs)
         self._token = token
         self._auth = tokens.TokenAuth(token)
         self._namespace = namespace
         self._pattern = re.compile(rf"^{namespace}/")
-        self._uniquify = uniquify
 
     @property
     def namespace(self) -> Optional[str]:
@@ -94,56 +81,36 @@ class HatClient(utils.SessionMixin):
     def token(self) -> Token:
         return self._token
 
-    @property
-    def uniquify(self) -> bool:
-        return self._uniquify
-
     @requires_namespace
     def get(
             self,
-            *endpoints: str | HatRecord,
+            mtype: Type[M],
+            endpoint: StringLike,
             options: Optional[GetOpts] = None,
-    ) -> HatRecords:
-        options = None if options is None else options.dict()
-        got = []
-        for endpoint in self._prepare_get(endpoints):
-            res = self._endpoint_request("GET", endpoint, json=options)
-            got.extend(get_records(res, errors.get_error))
-        got = [
-            # Unwrap the nesting from record-data uniquification.
-            HatRecord.copy(rec, update={"data": rec.data["data"]})
-            if isinstance(rec.data, dict) and "data" in rec.data
-            else rec
-            for rec in got]
-        return got
+    ) -> list[M]:
+        if options:
+            options = options.dict()
+        endpoint = self._prepare_get(endpoint)
+        res = self._endpoint_request("GET", endpoint, json=options)
+        return get_models(res, errors.get_error, mtype)
 
     @requires_namespace
-    def post(
-            self,
-            *records: HatRecord,
-            uniquify: Optional[bool] = None
-    ) -> HatRecords:
-        uniquify = self._uniquify if uniquify is None else uniquify
+    def post(self, *models: M) -> list[M]:
         posted = []
-        for endpoint, records in self._prepare_post(records, uniquify):
-            res = self._endpoint_request("POST", endpoint, json=records)
-            posted.extend(get_records(res, errors.post_error))
+        for endpoint, models in self._prepare_post(models):
+            res = self._endpoint_request("POST", endpoint, json=models)
+            posted.extend(get_models(res, errors.post_error, *types(models)))
         return posted
 
-    def put(
-            self,
-            *records: HatRecord,
-            uniquify: Optional[bool] = None
-    ) -> HatRecords:
-        uniquify = self._uniquify if uniquify is None else uniquify
-        put = self._prepare_put(records, uniquify)
+    def put(self, *models: HatModel) -> HatModels:
+        put = self._prepare_put(models)
         res = self._data_request("PUT", json=put)
-        return get_records(res, errors.put_error)
+        return get_models(res, errors.put_error, *types(models))
 
-    def delete(self, *records: str | HatRecord) -> None:
-        delete = self._prepare_delete(records)
+    def delete(self, *endpoints: StringLike) -> None:
+        delete = self._prepare_delete(endpoints)
         res = self._data_request("DELETE", params=delete)
-        get_records(res, errors.delete_error)
+        utils.get_json(res, errors.delete_error)
 
     def _endpoint_request(
             self, method: str, endpoint: str, **kwargs) -> Response:
@@ -158,50 +125,40 @@ class HatClient(utils.SessionMixin):
         return self._session.request(method, auth=self._auth, **kwargs)
 
     @staticmethod
-    def _prepare_get(records: Iterable[str | HatRecord]) -> list[str]:
-        return [
-            rec if isinstance(rec, str) else rec.endpoint
-            for rec in require_endpoint(records)]
+    def _prepare_get(model: StringLike) -> str:
+        model = next(require_endpoint([model]))
+        return model if isinstance(model, str) else model.endpoint
 
-    def _prepare_post(
-            self,
-            records: IHatRecords,
-            unique: bool
-    ) -> Iterable[tuple[str, list]]:
-        pattern = self._pattern
+    def _prepare_post(self, models: IHatModels) -> Iterable[tuple[str, list]]:
         formatted = []
         # Step 1: Ensure endpoints are present and formatted.
-        for rec in require_endpoint(records):
+        for m in require_endpoint(models):
             # The namespace is added when constructing the endpoint URL,
             # so it should not be a part of the endpoint here.
-            if pattern.match(rec.endpoint):
-                endpoint = pattern.split(rec.endpoint)[-1]
-                rec = HatRecord.copy(rec, update={"endpoint": endpoint})
-            formatted.append(rec)
+            if self._pattern.match(m.endpoint):
+                m.endpoint = self._pattern.split(m.endpoint)[-1]
+            formatted.append(m)
         # Step 2: Group by endpoint and make unique, if necessary.
-        for endpoint, records in group_by_endpoint(formatted):
-            records = _uniquify(*records, only_data=True) if unique else records
-            yield endpoint, records
+        for endpoint, models in group_by_endpoint(formatted):
+            yield endpoint, models
 
-    def _prepare_put(self, records: IHatRecords, unique: bool) -> list[dict]:
-        ns, pattern = self.namespace, self._pattern
+    def _prepare_put(self, models: IHatModels) -> list[dict]:
         prepared = []
-        for rec in require_endpoint(records):
+        for m in require_endpoint(models):
             # The endpoint should include the namespace. HatRecords created
             # from responses will include the namespace. This is just a
             # convenience if wanting to create HatRecords manually.
-            if pattern.match(e := rec.endpoint) is None:
-                rec = HatRecord.copy(rec, update={"endpoint": f"{ns}/{e}"})
-            rec = _uniquify(rec, only_data=False) if unique else rec.dict()
-            prepared.append(rec)
+            if self._pattern.match(m.endpoint) is None:
+                m.endpoint = f"{self.namespace}/{m.endpoint}"
+            prepared.append(m.to_record().dict())
         return prepared
 
     @staticmethod
-    def _prepare_delete(records: Iterable[str | HatRecord]) -> dict[str, list]:
-        records = [
-            rec if isinstance(rec, str) else rec.record_id
-            for rec in require_record_id(records)]
-        return {"records": records}
+    def _prepare_delete(endpoints: IStringLike) -> dict[str, list[str]]:
+        endpoints = [
+            e if isinstance(e, str) else e.record_id
+            for e in require_record_id(endpoints)]
+        return {"records": endpoints}
 
     def __repr__(self) -> str:
         return utils.to_string(
