@@ -8,18 +8,16 @@ Python [Dataswift HAT SDK](https://api.dataswift.io/).
 - Automatic token refreshing and verification
 - Supports any keyring credential for API owner token authentication
 - All Direct Data API operations:
-  - `POST`: groups records by endpoint to minimize request bandwidth
-  - `GET`: supports multiple endpoints and options
-  - `PUT`: supports multiple records to multiple endpoints
-  - `DELETE`: supports multiple records
+    - `POST`: groups records by endpoint to minimize request bandwidth
+    - `GET`: supports single-endpoint requests and options
+    - `PUT`: supports multi-record requests
+    - `DELETE`: supports multi-record requests
 - Response streaming and caching to minimize latency and bandwidth
 - Meaningful exception types
 - Lazy token initialization for efficiency
 - Session-based requests
-- Powerful model validation for records and API tokens
+- Powerful model validation and parsing for records and API tokens
   with [pydantic](https://github.com/samuelcolvin/pydantic/)
-- Supports arbitrary record data, including pydantic models and any
-  JSON-compatible data
 - Encouraged immutability to avoid subtle bugs
 
 ## Usage
@@ -40,21 +38,49 @@ client = HatClient(token, "namespace")
 ### CRUD API
 
 ```python
-from hat import HatClient, HatRecord
+from hat import HatClient, HatModel, GetOpts, Ordering
 
 client = HatClient(...)
-# GET requests can use a record object...
-records = client.get(HatRecord(endpoint="endpoint"), ...)
+
+# GET request options are also validated using pydantic:
+opts = GetOpts(order_by="id", ordering=Ordering.ASCENDING, skip=3, take=5)
+
+# GET requests accept objects with an endpoint attribute...
+models: list[MyModel] = client.get(MyModel, HatModel(endpoint="endpoint"), opts)
 # ...or just specify the endpoints.
-records = client.get("endpoint", ...)
+models = client.get(MyModel, "endpoint", ...)
 
-# Records are grouped by endpoint for efficient mixed-endpoint POST requests. 
-records = client.post(HatRecord(endpoint="endpoint", data={...}), ...)
+# Models are grouped by endpoint for efficient mixed-endpoint POST requests. 
+models: list[MyModel] = client.post(my_model, ...)
 
-records = client.put(HatRecord(endpoint="namespace/endpoint", data={...}), ...)
+models: list[MyModel] = client.put(my_model, ...)
 
-# Similar to GET requests, DELETE requests can specify a record object...
-client.delete(HatRecord(record_id="record_id"), ...)
+# Similar to GET requests, DELETE requests can specify an object...
+client.delete(HatModel(record_id="record_id"), ...)
 # ...or just the record IDs.
 client.delete("record_id", ...)
+```
+
+#### Active-record API
+
+```python
+from hat import HatClient, ActiveHatModel
+
+# Assign the client as a class attribute.
+ActiveHatModel.client = HatClient(...)
+
+
+# Model your data with pydantic.
+class EndpointModel(ActiveHatModel):
+    value: int
+
+
+# Retrieve models from their endpoint with automatic data binding from JSON.
+model: EndpointModel = EndpointModel.get("endpoint")[0]
+# Modify their attributes,...
+model.value += 1
+# ...easily persist the changes,...
+model.save()
+# ...or delete the model.
+model.delete()
 ```
