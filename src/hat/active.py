@@ -10,8 +10,10 @@ from .models import GetOpts, M
 class ActiveHatModel(models.HatModel):
     client: ClassVar[HatClient]
 
-    def save(self) -> A:
+    def save(self, endpoint: str | None = None) -> A:
         client: HatClient = self.client
+        if endpoint is not None:
+            self.endpoint = endpoint
         if has_id := self.record_id is not None:
             method = client.put
         else:
