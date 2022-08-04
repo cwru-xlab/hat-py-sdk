@@ -1,3 +1,4 @@
+from .active import A, ActiveHatModel
 from .client import HatClient
 from .errors import (AuthError, DeleteError, DuplicateDataError, GetError,
                      HatError, HatNotFoundError, LimitedTokenScopeError,
