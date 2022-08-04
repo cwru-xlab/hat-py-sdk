@@ -62,31 +62,30 @@ class LimitedTokenScopeError(GetError, PostError, PutError, DeleteError):
     pass
 
 
-T = TypeVar("T", bound=Exception)
-E = Type[T]
-Resolver = Callable[[Any], E]
-V = tuple[Optional[E], Optional[Resolver]]
+E = TypeVar("E", bound=Exception)
+Resolver = Callable[[Any], Type[E]]
+V = tuple[Optional[Type[E]], Optional[Resolver]]
 
 
-class ErrorMapping(Generic[T]):
+class ErrorMapping(Generic[E]):
     __slots__ = "_default", "_errors"
 
-    def __init__(self, default: E):
+    def __init__(self, default: Type[E]):
         self._default = default
         self._errors = self._new_map(default)
 
     @staticmethod
-    def _new_map(default: E) -> dict[int, V]:
+    def _new_map(default: Type[E]) -> dict[int, V]:
         return collections.defaultdict(lambda: (default, None))
 
-    def get(self, status: int, content: Any) -> E:
+    def get(self, status: int, content: Any) -> Type[E]:
         error, resolver = self._errors[status]
         return error if resolver is None else resolver(content)
 
     def put(
             self,
             status: int,
-            error: E | None = None,
+            error: Type[E] | None = None,
             resolver: Resolver | None = None
     ) -> None:
         if not (error is None) ^ (resolver is None):
@@ -97,7 +96,7 @@ class ErrorMapping(Generic[T]):
         self._errors.update(mapping._errors)
 
     @property
-    def default(self) -> E:
+    def default(self) -> Type[E]:
         return self._default
 
 
