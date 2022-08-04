@@ -1,28 +1,28 @@
 from __future__ import annotations
 
-from typing import ClassVar, Optional
+from typing import ClassVar, Optional, Type, TypeVar, cast
 
-from . import GetOpts, HatRecord, errors, models
-from .client import HatClient
+from . import GetOpts, errors, models
+from .client import HatClient, StringLike
 
 
-class ActiveHatRecord(models.HatRecord):
+class ActiveHatModel(models.HatModel):
     client: ClassVar[HatClient]
 
-    def save(self, uniquify: Optional[bool] = None) -> ActiveHatRecord:
+    def save(self) -> A:
         client: HatClient = self.client
         if has_id := self.record_id is not None:
             method = client.put
         else:
             method = client.post
         try:
-            saved = method(self, uniquify=uniquify)
+            saved = method(self)
         except errors.PutError as e:
             if has_id:
-                saved = client.post(self, uniquify=uniquify)
+                saved = client.post(self)
             else:
                 raise e
-        return self.from_record(saved[0])
+        return cast(A, saved[0])
 
     def delete(self) -> None:
         return self.client.delete(self)
@@ -30,12 +30,11 @@ class ActiveHatRecord(models.HatRecord):
     @classmethod
     def get(
             cls,
-            *endpoints: str | HatRecord,
+            mtype: Type[A],
+            endpoint: StringLike,
             options: Optional[GetOpts] = None
-    ) -> list[ActiveHatRecord]:
-        records = cls.client.get(*endpoints, options=options)
-        return [cls.from_record(rec) for rec in records]
+    ) -> list[A]:
+        return cls.client.get(mtype, endpoint, options=options)
 
-    @classmethod
-    def from_record(cls, record: HatRecord) -> ActiveHatRecord:
-        return ActiveHatRecord(**record.dict())
+
+A = TypeVar("A", bound=ActiveHatModel)

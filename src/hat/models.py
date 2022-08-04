@@ -26,6 +26,9 @@ class BaseHatModel(BaseModel, abc.ABC):
 class HatModel(BaseHatModel):
     pk: StrictStr = Field(default_factory=lambda: str(ulid.new()))
 
+    class Config:
+        extra = pydantic.Extra.allow
+
     @pydantic.validator("*", pre=True)
     def _check_nesting(cls, value: Any) -> Any:
         if isinstance(value, BaseHatModel):

@@ -18,9 +18,10 @@ StringLike = Union[str, HatModel, HatRecord]
 IStringLike = Iterable[StringLike]
 
 
-def group_by_endpoint(models: IHatModels) -> Iterable[tuple[str, IHatModels]]:
+def group_by_endpoint(models: IHatModels) -> Iterable[tuple[str, HatModels]]:
     by_endpoint = functools.partial(lambda r: r.endpoint)
-    return itertools.groupby(sorted(models, key=by_endpoint), by_endpoint)
+    groups = itertools.groupby(sorted(models, key=by_endpoint), by_endpoint)
+    return ((endpoint, list(models)) for endpoint, models in groups)
 
 
 def get_models(res: Response, on_error: OnError, *mtypes: Type[M]) -> HatModels:
@@ -97,9 +98,9 @@ class HatClient(utils.SessionMixin):
     @requires_namespace
     def post(self, *models: M) -> list[M]:
         posted = []
-        for endpoint, models in self._prepare_post(models):
+        for endpoint, models, mtypes in self._prepare_post(models):
             res = self._endpoint_request("POST", endpoint, json=models)
-            posted.extend(get_models(res, errors.post_error, *types(models)))
+            posted.extend(get_models(res, errors.post_error, *mtypes))
         return posted
 
     def put(self, *models: HatModel) -> HatModels:
@@ -129,7 +130,7 @@ class HatClient(utils.SessionMixin):
         model = next(require_endpoint([model]))
         return model if isinstance(model, str) else model.endpoint
 
-    def _prepare_post(self, models: IHatModels) -> Iterable[tuple[str, list]]:
+    def _prepare_post(self, models: IHatModels) -> Iterable[tuple]:
         formatted = []
         # Step 1: Ensure endpoints are present and formatted.
         for m in require_endpoint(models):
@@ -140,7 +141,7 @@ class HatClient(utils.SessionMixin):
             formatted.append(m)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, models in group_by_endpoint(formatted):
-            yield endpoint, models
+            yield endpoint, [m.to_record().data for m in models], types(models)
 
     def _prepare_put(self, models: IHatModels) -> list[dict]:
         prepared = []
