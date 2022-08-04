@@ -7,10 +7,9 @@ from typing import Any, Optional, TypeVar
 import pydantic
 import ulid
 from humps import camel
-from pydantic import BaseModel, Field, NonNegativeInt, conint, constr
+from pydantic import BaseModel, Field, NonNegativeInt, StrictStr, conint, constr
 
 T = TypeVar("T")
-StrictStr = constr(strict=True)  # Plays nicely with type checking
 
 
 class BaseHatModel(BaseModel, abc.ABC):
