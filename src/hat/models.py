@@ -24,17 +24,18 @@ class BaseHatModel(BaseModel, abc.ABC):
 
 
 class HatModel(BaseHatModel):
-    pk: StrictStr = Field(default_factory=lambda: str(ulid.new()))
+    uid: StrictStr = Field(default_factory=lambda: str(ulid.new()))
+
+    __reserved_attrs__ = ("uid",)
 
     class Config:
         extra = pydantic.Extra.allow
+        arbitrary_types_allowed = True
 
-    @pydantic.validator("*", pre=True)
-    def _check_nesting(cls, value: Any) -> Any:
-        if isinstance(value, BaseHatModel):
-            raise TypeError(
-                f"Nested BaseHatModel attributes is not supported. Use "
-                "pydantic.BaseModel instead.")
+    @pydantic.validator("*", always=True, allow_reuse=True)
+    def _check_reserved(cls, value: Any) -> Any:
+        if any(hasattr(value, a) for a in cls.__reserved_attrs__):
+            raise ValueError(f"'{value}' is a reserved attribute name.")
         return value
 
     @classmethod
