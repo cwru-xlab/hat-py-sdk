@@ -42,13 +42,14 @@ from hat import HatClient, HatModel, GetOpts, Ordering
 
 client = HatClient(...)
 
-# GET request options are also validated using pydantic:
-opts = GetOpts(order_by="id", ordering=Ordering.ASCENDING, skip=3, take=5)
-
 # GET requests accept objects with an endpoint attribute...
-models: list[MyModel] = client.get(MyModel, HatModel(endpoint="endpoint"), opts)
+models: list[MyModel] = client.get(
+    mtype=MyModel,
+    endpoint=HatModel(endpoint="endpoint"),
+    # GET request options are also validated using pydantic:
+    options=GetOpts(order_by="id", ordering=Ordering.ASCENDING, skip=3, take=5))
 # ...or just specify the endpoints.
-models = client.get(MyModel, "endpoint", ...)
+models = client.get(mtype=MyModel, endpoint="endpoint", ...)
 
 # Models are grouped by endpoint for efficient mixed-endpoint POST requests. 
 models: list[MyModel] = client.post(my_model, ...)

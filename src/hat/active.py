@@ -4,7 +4,7 @@ from typing import ClassVar, Optional, TypeVar
 
 from . import errors, models
 from .client import HatClient, StringLike
-from .models import GetOpts, M
+from .models import GetOpts
 
 
 class ActiveHatModel(models.HatModel):
@@ -36,11 +36,7 @@ class ActiveHatModel(models.HatModel):
             endpoint: StringLike,
             options: Optional[GetOpts] = None
     ) -> list[A]:
-        return cls.client.get(cls, endpoint, options=options)
-
-    @classmethod
-    def of(cls, model: M) -> A:
-        return cls.parse_obj(model)
+        return cls.client.get(mtype=cls, endpoint=endpoint, options=options)
 
 
 A = TypeVar("A", bound=ActiveHatModel)

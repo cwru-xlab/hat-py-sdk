@@ -85,9 +85,9 @@ class HatClient(utils.SessionMixin):
     @requires_namespace
     def get(
             self,
-            mtype: Type[M],
             endpoint: StringLike,
-            options: Optional[GetOpts] = None,
+            mtype: Type[M] = HatModel,
+            options: Optional[GetOpts] = None
     ) -> list[M]:
         if options:
             options = options.dict()
