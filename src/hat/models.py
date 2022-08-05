@@ -26,17 +26,9 @@ class BaseHatModel(BaseModel, abc.ABC):
 class HatModel(BaseHatModel):
     uid: StrictStr = Field(default_factory=lambda: str(ulid.new()))
 
-    __reserved_attrs__ = ("uid",)
-
     class Config:
         extra = pydantic.Extra.allow
         arbitrary_types_allowed = True
-
-    @pydantic.validator("*", always=True, allow_reuse=True)
-    def _check_reserved(cls, value: Any) -> Any:
-        if any(hasattr(value, a) for a in cls.__reserved_attrs__):
-            raise ValueError(f"'{value}' is a reserved attribute name.")
-        return value
 
     @classmethod
     def from_record(cls, record: HatRecord[M]) -> M:
@@ -62,7 +54,7 @@ class HatRecord(BaseHatModel, GenericModel, Generic[M]):
         return cls(
             endpoint=model.endpoint,
             record_id=model.record_id,
-            data=model.dict(exclude={"endpoint", "record_id"}))
+            data=model.dict(exclude=set(BaseHatModel.fields)))
 
     def to_model(self, model: Type[M]) -> M:
         return model.from_record(self)
