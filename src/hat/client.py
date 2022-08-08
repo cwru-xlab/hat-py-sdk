@@ -7,8 +7,7 @@ from typing import (Any, Callable, Generator, Iterable, Optional, Type, Union)
 
 from requests import Response
 
-import model
-from . import errors, tokens, urls, utils
+from . import errors, model, tokens, urls, utils
 from .model import GetOpts, HatModel, HatRecord, M
 from .tokens import Token
 from .utils import OnError
