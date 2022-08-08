@@ -54,7 +54,7 @@ class HatRecord(BaseHatModel, GenericModel, Generic[M]):
         return cls(
             endpoint=model.endpoint,
             record_id=model.record_id,
-            data=model.dict(exclude=set(BaseHatModel.fields)))
+            data=model.dict(exclude=set(BaseHatModel.__fields__)))
 
     def to_model(self, model: Type[M]) -> M:
         return model.from_record(self)
