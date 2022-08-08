@@ -19,6 +19,7 @@ PyJWT = { extras = ["crypto"], version = "^2.4.0" }
 humps = "^0.2.2"
 CacheControl = "^0.12.11"
 python-ulid = "^1.1.0"
+orjson = "^3.7.11"
 
 [tool.poetry.dev-dependencies]
 

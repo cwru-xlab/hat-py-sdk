@@ -4,6 +4,7 @@ import abc
 from enum import Enum
 from typing import Any, Generic, Optional, Type, TypeVar
 
+import orjson
 import pydantic
 import ulid
 from humps import camel
@@ -16,6 +17,8 @@ class HatConfig(pydantic.BaseConfig):
     use_enum_values = True
     allow_mutation = False
     alias_generator = camel.case
+    json_dumps = orjson.dumps
+    json_loads = orjson.loads
 
 
 class BaseHatModel(BaseModel, abc.ABC):
@@ -24,7 +27,7 @@ class BaseHatModel(BaseModel, abc.ABC):
 
 
 class HatModel(BaseHatModel):
-    uid: StrictStr = Field(default_factory=lambda: str(ulid.ULID()))
+    uid: str = Field(default_factory=lambda: str(ulid.ULID()))
 
     class Config:
         extra = pydantic.Extra.allow
