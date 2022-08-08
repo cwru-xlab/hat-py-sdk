@@ -12,9 +12,9 @@ from pydantic import BaseModel, Field, NonNegativeInt, StrictStr, conint, constr
 from pydantic.generics import GenericModel
 
 
-def orjson_dumps(value: Any, *, default: Any) -> str:
+def orjson_dumps(value: Any, **kwargs) -> str:
     # Ref: https://pydantic-docs.helpmanual.io/usage/exporting_models
-    return orjson.dumps(value, default=default).decode()
+    return orjson.dumps(value, **kwargs).decode()
 
 
 class HatConfig(pydantic.BaseConfig):
@@ -72,6 +72,10 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
         model.record_id = self.record_id
         model.endpoint = self.endpoint
         return model
+
+
+def json_all(models: Iterable[BaseHatModel]) -> str:
+    return orjson_dumps([m.json() for m in models])
 
 
 def to_records(models: Iterable[M]) -> list[HatRecord[M]]:

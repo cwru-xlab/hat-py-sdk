@@ -141,19 +141,19 @@ class HatClient(utils.SessionMixin):
             formatted.append(m)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, models in group_by_endpoint(formatted):
-            records = [m.json() for m in model.to_records(models)]
+            records = model.json_all(model.to_records(models))
             yield endpoint, records, types(models)
 
-    def _prepare_put(self, models: Iterable[M]) -> list[str]:
-        prepared = []
+    def _prepare_put(self, models: Iterable[M]) -> str:
+        formatted = []
         for m in require_endpoint(models):
             # The endpoint should include the namespace. HatRecords created
             # from responses will include the namespace. This is just a
             # convenience if wanting to create HatRecords manually.
             if self._pattern.match(m.endpoint) is None:
                 m.endpoint = f"{self.namespace}/{m.endpoint}"
-            prepared.append(model.to_record(m).json())
-        return prepared
+            formatted.append(m)
+        return model.json_all(model.to_records(formatted))
 
     @staticmethod
     def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:
