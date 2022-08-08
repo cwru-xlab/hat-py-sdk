@@ -90,22 +90,22 @@ class HatClient(utils.SessionMixin):
             options: Optional[GetOpts] = None
     ) -> list[M]:
         if options:
-            options = options.dict()
+            options = options.json()
         endpoint = self._prepare_get(endpoint)
-        res = self._endpoint_request("GET", endpoint, json=options)
+        res = self._endpoint_request("GET", endpoint, data=options)
         return get_models(res, errors.get_error, mtype)
 
     @requires_namespace
     def post(self, *models: M) -> list[M]:
         posted = []
         for endpoint, models, mtypes in self._prepare_post(models):
-            res = self._endpoint_request("POST", endpoint, json=models)
+            res = self._endpoint_request("POST", endpoint, data=models)
             posted.extend(get_models(res, errors.post_error, *mtypes))
         return posted
 
     def put(self, *models: M) -> list[M]:
         put = self._prepare_put(models)
-        res = self._data_request("PUT", json=put)
+        res = self._data_request("PUT", data=put)
         return get_models(res, errors.put_error, *types(models))
 
     def delete(self, *record_ids: StringLike) -> None:
@@ -141,9 +141,10 @@ class HatClient(utils.SessionMixin):
             formatted.append(m)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, models in group_by_endpoint(formatted):
-            yield endpoint, model.to_record(*models), types(models)
+            records = [m.json() for m in model.to_record(*models)]
+            yield endpoint, records, types(models)
 
-    def _prepare_put(self, models: Iterable[M]) -> list[dict[str, Any]]:
+    def _prepare_put(self, models: Iterable[M]) -> list[str]:
         prepared = []
         for m in require_endpoint(models):
             # The endpoint should include the namespace. HatRecords created
@@ -151,7 +152,7 @@ class HatClient(utils.SessionMixin):
             # convenience if wanting to create HatRecords manually.
             if self._pattern.match(m.endpoint) is None:
                 m.endpoint = f"{self.namespace}/{m.endpoint}"
-            prepared.append(model.to_record(m).dict())
+            prepared.append(model.to_record(m).json())
         return prepared
 
     @staticmethod
