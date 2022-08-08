@@ -11,7 +11,7 @@ from . import errors, tokens, urls, utils
 from .models import GetOpts, HatModel, HatRecord, M
 from .tokens import Token
 from .utils import OnError
-
+import models as model
 StringLike = Union[str, HatModel, HatRecord]
 IStringLike = Iterable[StringLike]
 
@@ -126,9 +126,9 @@ class HatClient(utils.SessionMixin):
         return self._session.request(method, auth=self._auth, **kwargs)
 
     @staticmethod
-    def _prepare_get(model: StringLike) -> str:
-        model = next(require_endpoint([model]))
-        return model if isinstance(model, str) else model.endpoint
+    def _prepare_get(string: StringLike) -> str:
+        string = next(require_endpoint([string]))
+        return string if isinstance(string, str) else string.endpoint
 
     def _prepare_post(self, models: Iterable[M]) -> Iterable[tuple]:
         formatted = []
@@ -141,7 +141,7 @@ class HatClient(utils.SessionMixin):
             formatted.append(m)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, models in group_by_endpoint(formatted):
-            yield endpoint, [m.to_record().data for m in models], types(models)
+            yield endpoint, model.to_record(*models), types(models)
 
     def _prepare_put(self, models: Iterable[M]) -> list[dict[str, Any]]:
         prepared = []
@@ -151,7 +151,7 @@ class HatClient(utils.SessionMixin):
             # convenience if wanting to create HatRecords manually.
             if self._pattern.match(m.endpoint) is None:
                 m.endpoint = f"{self.namespace}/{m.endpoint}"
-            prepared.append(m.to_record().dict())
+            prepared.append(model.to_record(m).dict())
         return prepared
 
     @staticmethod

@@ -38,16 +38,6 @@ class HatModel(BaseHatModel):
         extra = pydantic.Extra.allow
         arbitrary_types_allowed = True
 
-    @classmethod
-    def from_record(cls, record: HatRecord[M]) -> M:
-        model = cls.parse_obj(record.data)
-        model.record_id = record.record_id
-        model.endpoint = record.endpoint
-        return model
-
-    def to_record(self) -> HatRecord[M]:
-        return HatRecord.from_model(self)
-
 
 M = TypeVar("M", bound=HatModel)
 
@@ -65,13 +55,21 @@ class HatRecord(BaseHatModel, GenericModel, Generic[M]):
             data=model.dict(exclude=set(BaseHatModel.__fields__)))
 
     def to_model(self, model: Type[M]) -> M:
-        return model.from_record(self)
+        model = model.parse_obj(self.data)
+        model.record_id = self.record_id
+        model.endpoint = self.endpoint
+        return model
 
     def dict(self, by_alias: bool = True, **kwargs) -> dict[str, Any]:
         return super().dict(by_alias=by_alias, **kwargs)
 
     def json(self, by_alias: bool = True, **kwargs) -> str | None:
         return super().json(by_alias=by_alias, **kwargs)
+
+
+def to_record(*models: M) -> HatRecord[M] | list[HatRecord[M]]:
+    records = [HatRecord.from_model(m) for m in models]
+    return records if len(records) > 1 else records[0]
 
 
 class Ordering(str, Enum):
