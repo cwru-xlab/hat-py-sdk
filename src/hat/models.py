@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, Generic, Optional, Type, TypeVar
 
 import pydantic
-import ulid as ulidpy
+import ulid
 from humps import camel
 from pydantic import BaseModel, Field, NonNegativeInt, StrictStr, conint, constr
 from pydantic.generics import GenericModel
@@ -24,7 +24,7 @@ class BaseHatModel(BaseModel, abc.ABC):
 
 
 class HatModel(BaseHatModel):
-    uid: StrictStr = Field(default_factory=lambda: str(ulidpy.new()))
+    uid: StrictStr = Field(default_factory=lambda: str(ulid.ULID()))
 
     class Config:
         extra = pydantic.Extra.allow

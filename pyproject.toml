@@ -18,7 +18,7 @@ requests = "^2.28.1"
 PyJWT = { extras = ["crypto"], version = "^2.4.0" }
 humps = "^0.2.2"
 CacheControl = "^0.12.11"
-ulid-py = "^1.1.0"
+python-ulid = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
 
