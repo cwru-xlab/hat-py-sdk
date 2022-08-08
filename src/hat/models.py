@@ -15,15 +15,20 @@ from pydantic.generics import GenericModel
 class HatConfig(pydantic.BaseConfig):
     allow_population_by_field_name = True
     use_enum_values = True
-    allow_mutation = False
-    alias_generator = camel.case
     json_dumps = orjson.dumps
     json_loads = orjson.loads
+
+
+class ApiConfig(HatConfig):
+    alias_generator = camel.case
+    allow_mutation = False
 
 
 class BaseHatModel(BaseModel, abc.ABC):
     endpoint: Optional[StrictStr]
     record_id: Optional[StrictStr]
+
+    Config = HatConfig
 
 
 class HatModel(BaseHatModel):
@@ -50,7 +55,7 @@ M = TypeVar("M", bound=HatModel)
 class HatRecord(BaseHatModel, GenericModel, Generic[M]):
     data: dict[str, Any] = {}
 
-    Config = HatConfig
+    Config = ApiConfig
 
     @classmethod
     def from_model(cls, model: M) -> HatRecord[M]:
@@ -80,7 +85,7 @@ class GetOpts(BaseModel):
     skip: Optional[NonNegativeInt]
     take: Optional[conint(ge=0, le=1000)]
 
-    Config = HatConfig
+    Config = ApiConfig
 
     def dict(self, exclude_none: bool = True, **kwargs) -> dict:
         return super().dict(exclude_none=exclude_none, **kwargs)
