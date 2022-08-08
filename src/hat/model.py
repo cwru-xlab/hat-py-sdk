@@ -77,7 +77,11 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
 def records_json(models: Iterable[HatModel], data_only: bool = False) -> str:
     records = map(HatRecord.from_model, models)
     dump = HatRecord.__config__.json_dumps
-    return dump([dump(r.data) if data_only else r.json() for r in records])
+    if data_only:
+        records = dump([dump(r.data) for r in records])
+    else:
+        records = dump([r.json() for r in records])
+    return records
 
 
 class Ordering(str, Enum):
