@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import (Any, Callable, Generator, Iterable, Optional, Type, Union)
+from typing import Callable, Generator, Iterable, Optional, Type, Union
 
 from requests import Response
 
@@ -141,7 +141,7 @@ class HatClient(utils.SessionMixin):
             formatted.append(m)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, models in group_by_endpoint(formatted):
-            records = [m.json() for m in model.to_record(*models)]
+            records = [m.json() for m in model.to_records(models)]
             yield endpoint, records, types(models)
 
     def _prepare_put(self, models: Iterable[M]) -> list[str]:

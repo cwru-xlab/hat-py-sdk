@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 from enum import Enum
-from typing import Any, Generic, Optional, Type, TypeVar
+from typing import Any, Generic, Iterable, Optional, Type, TypeVar
 
 import orjson
 import pydantic
@@ -36,6 +36,16 @@ class BaseHatModel(BaseModel, abc.ABC):
     Config = HatConfig
 
 
+class BaseApiModel(BaseModel, abc.ABC):
+    Config = ApiConfig
+
+    def dict(self, by_alias: bool = True, **kwargs) -> dict[str, Any]:
+        return super().dict(by_alias=by_alias, **kwargs)
+
+    def json(self, by_alias: bool = True, **kwargs) -> str | None:
+        return super().json(by_alias=by_alias, **kwargs)
+
+
 class HatModel(BaseHatModel):
     uid: str = Field(default_factory=lambda: str(ulid.ULID()))
 
@@ -47,10 +57,8 @@ class HatModel(BaseHatModel):
 M = TypeVar("M", bound=HatModel)
 
 
-class HatRecord(BaseHatModel, GenericModel, Generic[M]):
+class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
     data: dict[str, Any] = {}
-
-    Config = ApiConfig
 
     @classmethod
     def from_model(cls, model: M) -> HatRecord[M]:
@@ -65,16 +73,13 @@ class HatRecord(BaseHatModel, GenericModel, Generic[M]):
         model.endpoint = self.endpoint
         return model
 
-    def dict(self, by_alias: bool = True, **kwargs) -> dict[str, Any]:
-        return super().dict(by_alias=by_alias, **kwargs)
 
-    def json(self, by_alias: bool = True, **kwargs) -> str | None:
-        return super().json(by_alias=by_alias, **kwargs)
+def to_records(models: Iterable[M]) -> list[HatRecord[M]]:
+    return list(map(HatRecord.from_model, models))
 
 
-def to_record(*models: M) -> HatRecord[M] | list[HatRecord[M]]:
-    records = [HatRecord.from_model(m) for m in models]
-    return records if len(records) > 1 else records[0]
+def to_record(m: M) -> HatRecord[M]:
+    return HatRecord.from_model(m)
 
 
 class Ordering(str, Enum):
@@ -82,13 +87,11 @@ class Ordering(str, Enum):
     DESCENDING = "descending"
 
 
-class GetOpts(BaseModel):
+class GetOpts(BaseApiModel):
     order_by: Optional[constr(min_length=1)]
     ordering: Optional[Ordering]
     skip: Optional[NonNegativeInt]
     take: Optional[conint(ge=0, le=1000)]
-
-    Config = ApiConfig
 
     def dict(self, exclude_none: bool = True, **kwargs) -> dict:
         return super().dict(exclude_none=exclude_none, **kwargs)
