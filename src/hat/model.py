@@ -12,10 +12,15 @@ from pydantic import BaseModel, Field, NonNegativeInt, StrictStr, conint, constr
 from pydantic.generics import GenericModel
 
 
+def orjson_dumps(value: Any, *, default: Any) -> str:
+    # Ref: https://pydantic-docs.helpmanual.io/usage/exporting_models
+    return orjson.dumps(value, default=default).decode()
+
+
 class HatConfig(pydantic.BaseConfig):
     allow_population_by_field_name = True
     use_enum_values = True
-    json_dumps = orjson.dumps
+    json_dumps = orjson_dumps
     json_loads = orjson.loads
 
 
