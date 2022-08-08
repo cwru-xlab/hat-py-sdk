@@ -74,16 +74,8 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
         return model
 
 
-def json_all(models: Iterable[BaseHatModel]) -> str:
-    return orjson_dumps([m.json() for m in models])
-
-
-def to_records(models: Iterable[M]) -> list[HatRecord[M]]:
-    return list(map(HatRecord.from_model, models))
-
-
-def to_record(m: M) -> HatRecord[M]:
-    return HatRecord.from_model(m)
+def records_json(models: Iterable[HatModel]) -> str:
+    return orjson_dumps([HatRecord.from_model(m).json() for m in models])
 
 
 class Ordering(str, Enum):

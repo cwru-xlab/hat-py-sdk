@@ -141,8 +141,7 @@ class HatClient(utils.SessionMixin):
             formatted.append(m)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, models in group_by_endpoint(formatted):
-            records = model.json_all(model.to_records(models))
-            yield endpoint, records, types(models)
+            yield endpoint, model.records_json(models), types(models)
 
     def _prepare_put(self, models: Iterable[M]) -> str:
         formatted = []
@@ -153,7 +152,7 @@ class HatClient(utils.SessionMixin):
             if self._pattern.match(m.endpoint) is None:
                 m.endpoint = f"{self.namespace}/{m.endpoint}"
             formatted.append(m)
-        return model.json_all(model.to_records(formatted))
+        return model.records_json(formatted)
 
     @staticmethod
     def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:
