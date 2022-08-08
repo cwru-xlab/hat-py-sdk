@@ -67,6 +67,11 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
             record_id=model.record_id,
             data=model.dict(exclude=set(BaseHatModel.__fields__)))
 
+    @classmethod
+    def parse_model(cls, response: dict[str, Any], model: Type[M]) -> M:
+        response["data"] = cls.Config.json_loads(response["data"])
+        return cls(**response).to_model(model)
+
     def to_model(self, model: Type[M]) -> M:
         model = model.parse_obj(self.data)
         model.record_id = self.record_id

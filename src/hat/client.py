@@ -28,7 +28,7 @@ def get_models(res: Response, on_error: OnError, *mtypes: Type[M]) -> list[M]:
         content = [content]
     # When more records exist than model types, try binding to the last one.
     mtypes, m = iter(mtypes), None
-    return [HatRecord(**rec).to_model(m := next(mtypes, m)) for rec in content]
+    return [HatRecord.parse_model(rec, m := next(mtypes, m)) for rec in content]
 
 
 def types(objs: Iterable) -> Iterable[Type]:
