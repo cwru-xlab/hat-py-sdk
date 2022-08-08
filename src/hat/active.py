@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from typing import ClassVar, Optional, TypeVar
 
-from . import errors, models
+from . import errors, model
 from .client import HatClient, StringLike
-from .models import GetOpts
 
 
-class ActiveHatModel(models.HatModel):
+class ActiveHatModel(model.HatModel):
     client: ClassVar[HatClient]
 
     def save(self, endpoint: str | None = None) -> A:
@@ -34,7 +33,7 @@ class ActiveHatModel(models.HatModel):
     def get(
             cls,
             endpoint: StringLike,
-            options: Optional[GetOpts] = None
+            options: Optional[model.GetOpts] = None
     ) -> list[A]:
         return cls.client.get(mtype=cls, endpoint=endpoint, options=options)
 

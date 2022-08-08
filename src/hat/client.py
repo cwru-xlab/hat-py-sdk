@@ -7,11 +7,12 @@ from typing import (Any, Callable, Generator, Iterable, Optional, Type, Union)
 
 from requests import Response
 
+import model
 from . import errors, tokens, urls, utils
-from .models import GetOpts, HatModel, HatRecord, M
+from .model import GetOpts, HatModel, HatRecord, M
 from .tokens import Token
 from .utils import OnError
-import models as model
+
 StringLike = Union[str, HatModel, HatRecord]
 IStringLike = Iterable[StringLike]
 

@@ -5,5 +5,5 @@ from .errors import (AuthError, DeleteError, DuplicateDataError, GetError,
                      MalformedBodyError, MissingPathError, PostError, PutError,
                      RecordNotFoundError, WrongCredentialsError,
                      WrongTokenError)
-from .models import GetOpts, HatModel, M, Ordering
+from .model import GetOpts, HatModel, M, Ordering
 from .tokens import ApiOwnerToken, AppToken, OwnerToken, Token, WebOwnerToken

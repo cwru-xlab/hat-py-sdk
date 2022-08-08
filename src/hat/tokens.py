@@ -10,7 +10,7 @@ from keyring.credentials import Credential
 from pydantic import BaseModel, PositiveInt, StrictStr, constr
 from requests import PreparedRequest, Response, auth
 
-from . import errors, models, urls, utils
+from . import errors, model, urls, utils
 
 JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
 
@@ -20,7 +20,7 @@ class JwtToken(BaseModel):
     iat: PositiveInt
     iss: constr(regex=r"^\w+\.hubat\.net$", strict=True)
 
-    Config = models.HatConfig
+    Config = model.ApiConfig
 
     @classmethod
     def decode(
