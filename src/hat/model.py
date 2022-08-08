@@ -69,7 +69,11 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
 
     @classmethod
     def parse_model(cls, response: dict[str, Any], model: Type[M]) -> M:
-        response["data"] = cls.Config.json_loads(response["data"])
+        if isinstance(response["data"], str):
+            try:  # Assume that the data is encoded JSON.
+                response["data"] = cls.Config.json_loads(response["data"])
+            except ValueError:
+                pass  # Allow pydantic to raise a ValidationError.
         return cls(**response).to_model(model)
 
     def to_model(self, model: Type[M]) -> M:
