@@ -48,7 +48,6 @@ class SessionMixin(contextlib.AbstractContextManager):
     def _default_session() -> requests.Session:
         session = requests_cache.CachedSession(
             backend=base.BaseCache,
-            ignored_parameters=[TOKEN_KEY],
             allowable_codes=[200] + list(errors.possible_codes),
             allowable_methods=["GET", "POST"],
             stale_if_error=True,
