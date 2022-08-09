@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import contextlib
+import datetime
 from typing import Any, Callable, Type
 
-import cachecontrol
 import requests
-from cachecontrol import heuristics
+import requests_cache
 from requests import Response
+from requests_cache.backends import base
+
+from . import errors, urls
 
 JSON_MIMETYPE = "application/json"
 TOKEN_KEY = "x-auth-token"
@@ -37,40 +40,39 @@ def handle(res: Response, on_success: OnSuccess, on_error: OnError) -> Any:
 class SessionMixin(contextlib.AbstractContextManager):
     __slots__ = "_session"
 
-    def __init__(
-            self,
-            session: requests.Session | None = None,
-            cache: bool = True,
-            stream: bool = True,
-            content_type: str | None = JSON_MIMETYPE):
+    def __init__(self, session: requests.Session | None = None, **kwargs):
         super().__init__()
-        if session is None:
-            session = requests.Session()
-            session.stream = stream
-            if cache:
-                session = cachecontrol.CacheControl(
-                    session, heuristic=heuristics.OneDayCache())
-        if content_type:
-            session.headers["Content-Type"] = content_type
-        self._session = session
+        self._session = session or self._default_session()
+
+    @staticmethod
+    def _default_session() -> requests.Session:
+        session = requests_cache.CachedSession(
+            backend=base.BaseCache,
+            ignored_parameters=[TOKEN_KEY],
+            allowable_codes=[200] + list(errors.possible_codes),
+            allowable_methods=["GET", "POST"],
+            stale_if_error=True,
+            expire_after=datetime.timedelta(minutes=10),
+            urls_expire_after={
+                urls.domain_owner_token("*"): requests_cache.DO_NOT_CACHE,
+                urls.domain_app_token("*", "*"): requests_cache.DO_NOT_CACHE})
+        session.stream = True
+        session.headers["Content-Type"] = JSON_MIMETYPE
+        return session
 
     def __enter__(self):
-        return self
+        with self._session:
+            return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._session.__exit__(exc_type, exc_val, exc_tb)
+        self._session.__exit__()
 
-    def close(self):
+    def clear_cache(self) -> None:
+        if isinstance(self._session, requests_cache.CachedSession):
+            self._session.cache.clear()
+
+    def close(self) -> None:
         self._session.close()
-
-
-_never_cache_adapter = cachecontrol.CacheControlAdapter()
-_never_cache_adapter.cacheable_methods = {}
-
-
-def never_cache(url: str, session: requests.Session) -> str:
-    session.mount(url, _never_cache_adapter)
-    return url
 
 
 def to_str(self: Any, **attrs) -> str:

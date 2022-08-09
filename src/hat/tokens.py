@@ -149,12 +149,8 @@ class ApiOwnerToken(OwnerToken):
 
     def __init__(self, credential: Credential, **kwargs):
         super().__init__(**kwargs)
-        self._url = self._get_url(credential)
+        self._url = urls.username_owner_token(credential.username)
         self._auth = CredentialAuth(credential)
-
-    def _get_url(self, credential: Credential) -> str:
-        url = urls.username_owner_token(credential.username)
-        return utils.never_cache(url, self._session)
 
     @property
     def url(self) -> str:
@@ -187,8 +183,7 @@ class AppToken(Token):
     @property
     def url(self) -> str:
         if self._url is None:
-            url = urls.domain_app_token(self.domain, self._app_id)
-            self._url = utils.never_cache(url, self._session)
+            self._url = urls.domain_app_token(self.domain, self._app_id)
         return self._url
 
     @property

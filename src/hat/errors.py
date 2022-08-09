@@ -108,6 +108,8 @@ def resolve_put_400(content: dict) -> Type[PutError]:
     return error
 
 
+possible_codes = (400, 401, 403, 404, 500)
+
 auth_errors = ErrorMapping(AuthError)
 auth_errors.put(401, WrongCredentialsError)
 auth_errors.put(404, HatNotFoundError)
