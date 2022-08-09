@@ -16,18 +16,18 @@ OnError = Callable[[int, Any], Type[Exception]]
 
 
 def get_json(res: Response, on_error: OnError) -> dict | list:
-    return _handle(res, lambda r: r.json(), on_error)
+    return handle(res, lambda r: r.json(), on_error)
 
 
 def get_string(res: Response, on_error: OnError) -> str:
-    return _handle(res, lambda r: r.text, on_error)
+    return handle(res, lambda r: r.text, on_error)
 
 
-def _handle(res: Response, on_success: OnSuccess, on_error: OnError) -> Any:
+def handle(res: Response, on_success: OnSuccess, on_error: OnError) -> Any:
     try:
         res.raise_for_status()
         return on_success(res)
-    except requests.RequestException as e:
+    except IOError as e:
         error = on_error(res.status_code, res.json())
         raise error(e)
     finally:
@@ -73,7 +73,7 @@ def never_cache(url: str, session: requests.Session) -> str:
     return url
 
 
-def to_string(cls: Any, **kwargs) -> str:
-    name = cls.__class__.__name__
-    attrs = ", ".join(f"{k}={v}" for k, v in kwargs.items())
+def to_str(self: Any, **attrs) -> str:
+    name = type(self).__name__
+    attrs = ", ".join(f"{name}={value}" for name, value in attrs.items())
     return f"{name}({attrs})"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 from enum import Enum
-from typing import Any, Generic, Iterable, Optional, Type, TypeVar
+from typing import Any, AnyStr, Generic, Iterable, Optional, Type, TypeVar
 
 import orjson
 import pydantic
@@ -68,29 +68,32 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
             data=model.dict(exclude=set(BaseHatModel.__fields__)))
 
     @classmethod
-    def parse_model(cls, response: dict[str, Any], model: Type[M]) -> M:
-        if isinstance(response["data"], str):
-            try:  # Assume that the data is encoded JSON.
-                response["data"] = cls.Config.json_loads(response["data"])
-            except ValueError:
-                pass  # Allow pydantic to raise a ValidationError.
-        return cls(**response).to_model(model)
+    def parse(cls, records: AnyStr, *mtypes: Type[M]) -> list[M]:
+        if not isinstance(records := cls.__config__.json_loads(records), list):
+            records = [records]
+        # When more records exist than model types, try binding to the last one.
+        mtypes, m = iter(mtypes), None
+        return [cls._to_model(r, m := next(mtypes, m)) for r in records]
 
-    def to_model(self, model: Type[M]) -> M:
-        model = model.parse_obj(self.data)
-        model.record_id = self.record_id
-        model.endpoint = self.endpoint
+    @classmethod
+    def _to_model(cls, record: dict[str, Any], mtype: Type[M]) -> M:
+        if isinstance(record["data"], (bytes, str)):
+            record["data"] = cls.__config__.json_loads(record["data"])
+        record = cls(**record)
+        model = mtype.parse_obj(record.data)
+        model.record_id = record.record_id
+        model.endpoint = record.endpoint
         return model
 
-
-def records_json(models: Iterable[HatModel], data_only: bool = False) -> str:
-    records = map(HatRecord.from_model, models)
-    dump = HatRecord.__config__.json_dumps
-    if data_only:
-        records = dump([dump(r.data) for r in records])
-    else:
-        records = dump([r.json() for r in records])
-    return records
+    @classmethod
+    def to_json(cls, models: Iterable[M], data_only: bool = False) -> str:
+        records = map(cls.from_model, models)
+        dump = cls.__config__.json_dumps
+        if data_only:
+            records = [dump(r.data) for r in records]
+        else:
+            records = [r.json() for r in records]
+        return dump(records)
 
 
 class Ordering(str, Enum):

@@ -130,7 +130,7 @@ class Token(utils.SessionMixin, abc.ABC):
         return min(iat + self._ttl, exp)
 
     def __repr__(self) -> str:
-        return utils.to_string(self, domain=self._domain, expires=self._expires)
+        return utils.to_str(self, domain=self._domain, expires=self._expires)
 
 
 class OwnerToken(Token, abc.ABC):
@@ -236,4 +236,4 @@ class TokenAuth(auth.AuthBase):
         return res
 
     def __repr__(self) -> str:
-        return utils.to_string(self, token=self._token)
+        return utils.to_str(self, token=self._token)

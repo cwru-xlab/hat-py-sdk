@@ -23,12 +23,8 @@ def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
 
 
 def get_models(res: Response, on_error: OnError, *mtypes: Type[M]) -> list[M]:
-    content = utils.get_json(res, on_error)
-    if not isinstance(content, list):
-        content = [content]
-    # When more records exist than model types, try binding to the last one.
-    mtypes, m = iter(mtypes), None
-    return [HatRecord.parse_model(rec, m := next(mtypes, m)) for rec in content]
+    return utils.handle(
+        res, lambda r: model.HatRecord.parse(r.content, *mtypes), on_error)
 
 
 def types(objs: Iterable) -> Iterable[Type]:
@@ -130,7 +126,7 @@ class HatClient(utils.SessionMixin):
         string = next(require_endpoint([string]))
         return string if isinstance(string, str) else string.endpoint
 
-    def _prepare_post(self, models: Iterable[M]) -> Iterable[tuple]:
+    def _prepare_post(self, models: Iterable[M]) -> Generator[tuple]:
         formatted = []
         # Step 1: Ensure endpoints are present and formatted.
         for m in require_endpoint(models):
@@ -141,7 +137,7 @@ class HatClient(utils.SessionMixin):
             formatted.append(m)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, models in group_by_endpoint(formatted):
-            records = model.records_json(models, data_only=True)
+            records = model.HatRecord.to_json(models, data_only=True)
             yield endpoint, records, types(models)
 
     def _prepare_put(self, models: Iterable[M]) -> str:
@@ -153,7 +149,7 @@ class HatClient(utils.SessionMixin):
             if self._pattern.match(m.endpoint) is None:
                 m.endpoint = f"{self.namespace}/{m.endpoint}"
             formatted.append(m)
-        return model.records_json(formatted)
+        return model.HatRecord.to_json(formatted)
 
     @staticmethod
     def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:
@@ -163,5 +159,4 @@ class HatClient(utils.SessionMixin):
         return {"records": record_ids}
 
     def __repr__(self) -> str:
-        return utils.to_string(
-            self, token=self._token, namespace=self._namespace)
+        return utils.to_str(self, token=self._token, namespace=self._namespace)
