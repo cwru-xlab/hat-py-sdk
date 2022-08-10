@@ -73,7 +73,7 @@ ActiveHatModel.client = HatClient(...)
 
 # Model your data with pydantic.
 class EndpointModel(ActiveHatModel):
-    value: int
+  value: int
 
 
 # Retrieve models from their endpoint with automatic data binding from JSON.
