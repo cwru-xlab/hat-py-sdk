@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import ClassVar, Iterable, Optional, TypeVar
 
-import errors
+from . import errors
 from .client import HatClient, M, StringLike
 from .model import GetOpts, HatModel
 
