@@ -60,7 +60,8 @@ def requires_namespace(method: Callable) -> Callable:
 def ensure_iterable(method: Callable) -> Callable:
     @functools.wraps(method)
     def wrapper(self, iterable, *args, **kwargs):
-        if not isinstance(iterable, Iterable):
+        # pydantic.BaseModel is an Iterable, so we need to check subclasses.
+        if not isinstance(iterable, (Iterator, Generator, list, tuple)):
             iterable = [iterable]
         return method(self, iterable, *args, **kwargs)
 
