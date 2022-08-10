@@ -3,8 +3,8 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import (Callable, Generator, Iterable, Iterator, Optional, Type,
-                    Union)
+from typing import (Callable, Collection, Generator, Iterable, Iterator,
+                    Optional, Type, Union)
 
 from requests import Response
 
@@ -61,7 +61,7 @@ def ensure_iterable(method: Callable) -> Callable:
     @functools.wraps(method)
     def wrapper(self, iterable, *args, **kwargs):
         # pydantic.BaseModel is an Iterable, so we need to check subclasses.
-        if not isinstance(iterable, (Iterator, Generator, list, tuple)):
+        if not isinstance(iterable, (Iterator, Collection)):
             iterable = [iterable]
         return method(self, iterable, *args, **kwargs)
 
