@@ -8,9 +8,9 @@ from typing import (Callable, Generator, Iterable, Iterator, Optional, Type,
 
 from requests import Response
 
-from . import errors, tokens, urls, utils
+from . import errors, urls, utils
 from .model import GetOpts, HatModel, HatRecord, M
-from .tokens import Token
+from .tokens import Token, TokenAuth
 from .utils import OnError, SessionMixin
 
 StringLike = Union[str, HatModel]
@@ -78,7 +78,7 @@ class HatClient(SessionMixin):
             **kwargs):
         super().__init__(token._session if share_session else None, **kwargs)
         self._token = token
-        self._auth = tokens.TokenAuth(token)
+        self._auth = TokenAuth(token)
         self._namespace = namespace
         self._pattern = re.compile(rf"^{namespace}/")
 

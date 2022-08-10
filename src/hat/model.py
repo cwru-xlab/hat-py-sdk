@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import abc
+from abc import ABC
 from enum import Enum
 from typing import Any, AnyStr, Generic, Iterable, Optional, Type, TypeVar
 
@@ -8,7 +8,8 @@ import orjson
 import pydantic
 import ulid
 from humps import camel
-from pydantic import BaseModel, Field, NonNegativeInt, StrictStr, conint, constr
+from pydantic import (BaseConfig, BaseModel, Field, NonNegativeInt, StrictStr,
+                      conint, constr)
 from pydantic.generics import GenericModel
 
 
@@ -17,7 +18,7 @@ def orjson_dumps(value: Any, **kwargs) -> str:
     return orjson.dumps(value, **kwargs).decode()
 
 
-class HatConfig(pydantic.BaseConfig):
+class HatConfig(BaseConfig):
     allow_population_by_field_name = True
     use_enum_values = True
     json_dumps = orjson_dumps
@@ -29,14 +30,14 @@ class ApiConfig(HatConfig):
     allow_mutation = False
 
 
-class BaseHatModel(BaseModel, abc.ABC):
+class BaseHatModel(BaseModel, ABC):
     endpoint: Optional[StrictStr]
     record_id: Optional[StrictStr]
 
     Config = HatConfig
 
 
-class BaseApiModel(BaseModel, abc.ABC):
+class BaseApiModel(BaseModel, ABC):
     Config = ApiConfig
 
     def dict(self, by_alias: bool = True, **kwargs) -> dict[str, Any]:
