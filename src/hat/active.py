@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import ClassVar, Iterable, Optional, TypeVar
 
-from . import GetOpts, HatModel, errors
+import errors
 from .client import HatClient, M, StringLike
+from .model import GetOpts, HatModel
 
 
 class ActiveHatModel(HatModel):
