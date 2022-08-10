@@ -145,14 +145,12 @@ class HatClient(SessionMixin):
 
     def _prepare_post(self, models: Iterable[M]) -> Generator[tuple]:
         formatted = []
-        # Step 1: Ensure endpoints are present and formatted.
         for m in require_endpoint(models):
             # The namespace is added when constructing the endpoint URL,
             # so it should not be a part of the endpoint here.
             if self._pattern.match(m.endpoint):
                 m.endpoint = self._pattern.split(m.endpoint)[-1]
             formatted.append(m)
-        # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, models in group_by_endpoint(formatted):
             records = HatRecord.to_json(models, data_only=True)
             yield endpoint, records, types(models)
