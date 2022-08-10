@@ -106,8 +106,6 @@ class HatClient(SessionMixin):
     @ensure_iterable
     @requires_namespace
     def post(self, models: M | Iterable[M]) -> list[M]:
-        if not isinstance(models, Iterable):
-            models = [models]
         posted = []
         for endpoint, models, mtypes in self._prepare_post(models):
             res = self._endpoint_request("POST", endpoint, data=models)
