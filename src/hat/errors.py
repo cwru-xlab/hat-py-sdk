@@ -85,8 +85,8 @@ class ErrorMapping(Generic[E]):
     def put(
             self,
             status: int,
-            error: Type[E] | None = None,
-            resolver: Resolver | None = None
+            error: Optional[Type[E]] = None,
+            resolver: Optional[Resolver] = None
     ) -> None:
         if not (error is None) ^ (resolver is None):
             raise ValueError("Either 'error' or 'resolver' must be specified")

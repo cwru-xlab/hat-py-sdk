@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
-from typing import Any, Callable, Type
+from typing import Any, Callable, Optional, Type
 
 import requests
 import requests_cache
@@ -40,7 +40,7 @@ def handle(res: Response, on_success: OnSuccess, on_error: OnError) -> Any:
 class SessionMixin(contextlib.AbstractContextManager):
     __slots__ = "_session"
 
-    def __init__(self, session: requests.Session | None = None, **kwargs):
+    def __init__(self, session: Optional[requests.Session] = None, **kwargs):
         super().__init__()
         self._session = session or self._default_session()
 

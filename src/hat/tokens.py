@@ -10,7 +10,9 @@ from keyring.credentials import Credential
 from pydantic import BaseModel, PositiveInt, StrictStr, constr
 from requests import PreparedRequest, Response, auth
 
-from . import errors, model, urls, utils
+from . import errors, urls, utils
+from .model import ApiConfig
+from .utils import SessionMixin
 
 JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
 
@@ -20,14 +22,14 @@ class JwtToken(BaseModel):
     iat: PositiveInt
     iss: constr(regex=r"^\w+\.hubat\.net$", strict=True)
 
-    Config = model.ApiConfig
+    Config = ApiConfig
 
     @classmethod
     def decode(
             cls,
             encoded: str,
             *,
-            pk: str | None = None,
+            pk: Optional[str] = None,
             verify: bool = False,
             as_token: bool = False
     ) -> dict | JwtToken:
@@ -65,7 +67,7 @@ class JwtAppToken(JwtToken):
         return JwtAppToken(**super().decode(encoded, **kwargs))
 
 
-class Token(utils.SessionMixin, abc.ABC):
+class Token(SessionMixin, abc.ABC):
     __slots__ = "_value", "_decoded", "_pk", "_ttl", "_domain", "_expires"
 
     def __init__(self, **kwargs):

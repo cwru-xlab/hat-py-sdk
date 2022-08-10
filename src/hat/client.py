@@ -3,17 +3,19 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import Callable, Generator, Iterable, Optional, Type, Union
+from typing import (Callable, Generator, Iterable, Iterator, Optional, Type,
+                    Union)
 
 from requests import Response
 
-from . import errors, model, tokens, urls, utils
+from . import errors, tokens, urls, utils
 from .model import GetOpts, HatModel, HatRecord, M
 from .tokens import Token
-from .utils import OnError
+from .utils import OnError, SessionMixin
 
-StringLike = Union[str, HatModel, HatRecord]
+StringLike = Union[str, HatModel]
 IStringLike = Iterable[StringLike]
+MTypes = Iterable[Type[M]]
 
 
 def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
@@ -22,23 +24,23 @@ def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
     return ((endpoint, list(models)) for endpoint, models in groups)
 
 
-def get_models(res: Response, on_error: OnError, *mtypes: Type[M]) -> list[M]:
+def get_models(res: Response, on_error: OnError, mtypes: MTypes) -> list[M]:
     return utils.handle(
-        res, lambda r: model.HatRecord.parse(r.content, *mtypes), on_error)
+        res, lambda r: HatRecord.parse(r.content, mtypes), on_error)
 
 
-def types(objs: Iterable) -> Iterable[Type]:
-    return (type(o) for o in objs)
+def types(models: Iterable[M]) -> MTypes:
+    return (type(m) for m in models)
 
 
-def require_endpoint(strings: IStringLike) -> Generator[StringLike]:
+def require_endpoint(strings: IStringLike) -> Iterator[StringLike]:
     for s in strings:
         if hasattr(s, "endpoint") and s.endpoint is None:
             raise ValueError("'endpoint' is required")
         yield s
 
 
-def require_record_id(strings: IStringLike) -> Generator[StringLike]:
+def require_record_id(strings: IStringLike) -> Iterator[StringLike]:
     for s in strings:
         if hasattr(s, "record_id") and s.record_id is None:
             raise ValueError("'record_id' is required")
@@ -55,7 +57,17 @@ def requires_namespace(method: Callable) -> Callable:
     return wrapper
 
 
-class HatClient(utils.SessionMixin):
+def ensure_iterable(method: Callable) -> Callable:
+    @functools.wraps(method)
+    def wrapper(self, iterable, *args, **kwargs):
+        if not isinstance(iterable, Iterable):
+            iterable = [iterable]
+        return method(self, iterable, *args, **kwargs)
+
+    return wrapper
+
+
+class HatClient(SessionMixin):
     __slots__ = "_token", "_auth", "_namespace", "_pattern"
 
     def __init__(
@@ -89,22 +101,27 @@ class HatClient(utils.SessionMixin):
             options = options.json()
         endpoint = self._prepare_get(endpoint)
         res = self._endpoint_request("GET", endpoint, data=options)
-        return get_models(res, errors.get_error, mtype)
+        return get_models(res, errors.get_error, [mtype])
 
+    @ensure_iterable
     @requires_namespace
-    def post(self, *models: M) -> list[M]:
+    def post(self, models: M | Iterable[M]) -> list[M]:
+        if not isinstance(models, Iterable):
+            models = [models]
         posted = []
         for endpoint, models, mtypes in self._prepare_post(models):
             res = self._endpoint_request("POST", endpoint, data=models)
-            posted.extend(get_models(res, errors.post_error, *mtypes))
+            posted.extend(get_models(res, errors.post_error, mtypes))
         return posted
 
-    def put(self, *models: M) -> list[M]:
+    @ensure_iterable
+    def put(self, models: M | Iterable[M]) -> list[M]:
         put = self._prepare_put(models)
         res = self._data_request("PUT", data=put)
-        return get_models(res, errors.put_error, *types(models))
+        return get_models(res, errors.put_error, types(models))
 
-    def delete(self, *record_ids: StringLike) -> None:
+    @ensure_iterable
+    def delete(self, record_ids: StringLike | IStringLike) -> None:
         delete = self._prepare_delete(record_ids)
         res = self._data_request("DELETE", params=delete)
         utils.get_json(res, errors.delete_error)
@@ -137,7 +154,7 @@ class HatClient(utils.SessionMixin):
             formatted.append(m)
         # Step 2: Group by endpoint and make unique, if necessary.
         for endpoint, models in group_by_endpoint(formatted):
-            records = model.HatRecord.to_json(models, data_only=True)
+            records = HatRecord.to_json(models, data_only=True)
             yield endpoint, records, types(models)
 
     def _prepare_put(self, models: Iterable[M]) -> str:
@@ -149,7 +166,7 @@ class HatClient(utils.SessionMixin):
             if self._pattern.match(m.endpoint) is None:
                 m.endpoint = f"{self.namespace}/{m.endpoint}"
             formatted.append(m)
-        return model.HatRecord.to_json(formatted)
+        return HatRecord.to_json(formatted)
 
     @staticmethod
     def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import ClassVar, Optional, TypeVar
 
-from . import errors, model
+from . import GetOpts, HatModel, errors
 from .client import HatClient, StringLike
 
 
-class ActiveHatModel(model.HatModel):
+class ActiveHatModel(HatModel):
     client: ClassVar[HatClient]
 
-    def save(self, endpoint: str | None = None) -> A:
+    def save(self, endpoint: Optional[str] = None) -> A:
         client: HatClient = self.client
         if endpoint is not None:
             self.endpoint = endpoint
@@ -33,7 +33,7 @@ class ActiveHatModel(model.HatModel):
     def get(
             cls,
             endpoint: StringLike,
-            options: Optional[model.GetOpts] = None
+            options: Optional[GetOpts] = None
     ) -> list[A]:
         return cls.client.get(mtype=cls, endpoint=endpoint, options=options)
 
