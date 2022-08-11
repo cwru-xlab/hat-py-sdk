@@ -2,10 +2,6 @@ from __future__ import annotations
 
 import re
 
-API_VERSION = "v2.6"
-SCHEME = "https"
-SCHEME_PATTERN = re.compile(r"^(?:http|https):/+")
-
 
 def with_scheme(url: str) -> str:
     if SCHEME_PATTERN.match(url) is None:
@@ -65,3 +61,18 @@ def username_endpoint(username: str, namespace: str, endpoint: str) -> str:
 
 def domain_endpoint(domain: str, namespace: str, endpoint: str) -> str:
     return f"{domain_data(domain)}/{namespace}/{endpoint}"
+
+
+def no_scheme(pattern: str) -> re.Pattern:
+    return re.compile(rf".*{SCHEME_PATTERN.split(pattern)[-1]}$")
+
+
+API_VERSION = "v2.6"
+SCHEME = "https"
+
+SCHEME_PATTERN = re.compile(r"^(?:http|https):/+")
+PK_PATTERN = no_scheme(username_public_key(r"\w+"))
+OWNER_TOKEN_PATTERN = no_scheme(username_owner_token(r"\w+"))
+APP_TOKEN_PATTERN = no_scheme(username_app_token(r"\w+", r"\w+"))
+ENDPOINT_PATTERN = no_scheme(username_endpoint(r"\w+", r"\w+", r"\w+"))
+DATA_PATTERN = no_scheme(username_data(r"\w+"))
