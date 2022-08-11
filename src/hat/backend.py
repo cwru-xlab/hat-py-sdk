@@ -1,37 +1,58 @@
 from __future__ import annotations
 
 import abc
-import asyncio
 from contextlib import AbstractAsyncContextManager, AbstractContextManager
-from typing import Optional
+from typing import Any, Optional
 
-import aiohttp
 from aiohttp import ClientResponse, ClientResponseError, ClientSession
 from requests import HTTPError, Response, Session
 
 
-class Handler:
+class Handler(abc.ABC):
     __slots__ = ()
 
-    def on_success(self, response: Response):
+    @abc.abstractmethod
+    def on_success(self, response: Any) -> Any:
+        pass
+
+    @abc.abstractmethod
+    def on_error(self, error: BaseException) -> Any:
+        pass
+
+
+class SyncHandler(Handler):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def on_success(self, response: Response) -> Any:
         return response
 
-    def on_error(self, error: HTTPError):
+    def on_error(self, error: HTTPError) -> Any:
         raise error
 
 
 class AsyncHandler(Handler):
     __slots__ = ()
 
-    async def on_success(self, response: ClientResponse):
+    def __init__(self) -> None:
+        super().__init__()
+
+    async def on_success(self, response: ClientResponse) -> Any:
         return response
 
-    async def on_error(self, error: ClientResponseError):
+    async def on_error(self, error: ClientResponseError) -> Any:
         raise error
 
 
 class HttpClient(abc.ABC):
+    __slots__ = ()
 
+    def __init__(self):
+        super().__init__()
+
+    @abc.abstractmethod
     def request(self, method: str, url: str, **kwargs):
         pass
 
@@ -39,19 +60,18 @@ class HttpClient(abc.ABC):
 class SyncHttpClient(HttpClient, AbstractContextManager):
     __slots__ = "handler", "_session"
 
-    def __init__(self, session: Session, handler: Optional[Handler] = None):
+    def __init__(self, session: Session, handler: Optional[SyncHandler] = None):
         super().__init__()
-        self.handler = self._check_handler(handler) or Handler()
+        self.handler = self._check_handler(handler) or SyncHandler()
         self._session = session
 
     @staticmethod
-    def _check_handler(handler: Handler) -> Handler:
-        methods = (handler.on_success, handler.on_error)
-        if any(map(asyncio.iscoroutinefunction, methods)):
-            raise TypeError("'handler' must not have any async methods")
+    def _check_handler(handler: SyncHandler) -> SyncHandler:
+        if not isinstance(handler, SyncHandler):
+            raise TypeError("'handler' must be a SyncHandler")
         return handler
 
-    def request(self, method: str, url: str, **kwargs):
+    def request(self, method: str, url: str, **kwargs) -> Any:
         response = self._session.request(method=method, url=url, **kwargs)
         try:
             response.raise_for_status()
@@ -67,8 +87,8 @@ class SyncHttpClient(HttpClient, AbstractContextManager):
         with self._session:
             return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        return self._session.__exit__(exc_type, exc_val, exc_tb)
+    def __exit__(self, *args) -> None:
+        return self._session.__exit__(*args)
 
 
 class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
@@ -79,14 +99,20 @@ class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
             session: ClientSession,
             handler: Optional[AsyncHandler] = None):
         super().__init__()
-        self.handler = handler or AsyncHandler()
+        self.handler = self._check_handler(handler) or AsyncHandler()
         self._session = session
+
+    @staticmethod
+    def _check_handler(handler: AsyncHandler) -> AsyncHandler:
+        if not isinstance(handler, AsyncHandler):
+            raise TypeError("'handler' must be an AsyncHandler")
+        return handler
 
     async def request(self, method: str, url: str, **kwargs):
         kwargs["raise_for_status"] = True
         try:
             response = await self._session.request(method, url, **kwargs)
-        except aiohttp.ClientResponseError as error:
+        except ClientResponseError as error:
             result = await self.handler.on_error(error)
         else:
             result = await self.handler.on_success(response)
@@ -97,5 +123,5 @@ class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
         async with self._session:
             return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        return await self._session.__aexit__(exc_type, exc_val, exc_tb)
+    async def __aexit__(self, *args) -> None:
+        return await self._session.__aexit__(*args)
