@@ -1,23 +1,12 @@
 from __future__ import annotations
 
-import abc
 from contextlib import AbstractAsyncContextManager, AbstractContextManager
 from typing import Any, Optional
 
 from aiohttp import ClientResponse, ClientResponseError, ClientSession
 from requests import HTTPError, Response, Session
 
-
-class Handler(abc.ABC):
-    __slots__ = ()
-
-    @abc.abstractmethod
-    def on_success(self, response: Any) -> Any:
-        pass
-
-    @abc.abstractmethod
-    def on_error(self, error: BaseException) -> Any:
-        pass
+from base import Handler, HttpClient
 
 
 class SyncHandler(Handler):
@@ -44,17 +33,6 @@ class AsyncHandler(Handler):
 
     async def on_error(self, error: ClientResponseError, **kwargs) -> Any:
         raise error
-
-
-class HttpClient(abc.ABC):
-    __slots__ = ()
-
-    def __init__(self):
-        super().__init__()
-
-    @abc.abstractmethod
-    def request(self, method: str, url: str, **kwargs):
-        pass
 
 
 class SyncHttpClient(HttpClient, AbstractContextManager):

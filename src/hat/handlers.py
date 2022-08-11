@@ -8,7 +8,8 @@ from aiohttp import ClientResponse, ClientResponseError
 from requests import HTTPError, Response
 
 from . import errors, urls
-from .backend import AsyncHandler, Handler, SyncHandler
+from .backend import AsyncHandler, SyncHandler
+from .base import Handler
 from .model import HatRecord, M
 
 error_maps: dict[str, errors.ErrorMapping] = {
