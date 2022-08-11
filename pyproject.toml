@@ -20,6 +20,7 @@ humps = "^0.2.2"
 python-ulid = "^1.1.0"
 orjson = "^3.7.11"
 requests-cache = "^0.9.5"
+aiohttp = {extras = ["speedups"], version = "^3.8.1"}
 
 [tool.poetry.dev-dependencies]
 
