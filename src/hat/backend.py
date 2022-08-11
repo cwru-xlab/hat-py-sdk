@@ -26,10 +26,10 @@ class SyncHandler(Handler):
     def __init__(self) -> None:
         super().__init__()
 
-    def on_success(self, response: Response) -> Any:
+    def on_success(self, response: Response, **kwargs) -> Any:
         return response
 
-    def on_error(self, error: HTTPError) -> Any:
+    def on_error(self, error: HTTPError, **kwargs) -> Any:
         raise error
 
 
@@ -39,10 +39,10 @@ class AsyncHandler(Handler):
     def __init__(self) -> None:
         super().__init__()
 
-    async def on_success(self, response: ClientResponse) -> Any:
+    async def on_success(self, response: ClientResponse, **kwargs) -> Any:
         return response
 
-    async def on_error(self, error: ClientResponseError) -> Any:
+    async def on_error(self, error: ClientResponseError, **kwargs) -> Any:
         raise error
 
 
@@ -76,9 +76,9 @@ class SyncHttpClient(HttpClient, AbstractContextManager):
         try:
             response.raise_for_status()
         except HTTPError as error:
-            result = self.handler.on_error(error)
+            result = self.handler.on_error(error, **kwargs)
         else:
-            result = self.handler.on_success(response)
+            result = self.handler.on_success(response, **kwargs)
         finally:
             response.close()
         return result
@@ -113,9 +113,9 @@ class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
         try:
             response = await self._session.request(method, url, **kwargs)
         except ClientResponseError as error:
-            result = await self.handler.on_error(error)
+            result = await self.handler.on_error(error, **kwargs)
         else:
-            result = await self.handler.on_success(response)
+            result = await self.handler.on_success(response, **kwargs)
             response.close()  # raise_for_status() closes the response.
         return result
 
