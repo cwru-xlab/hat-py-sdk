@@ -3,8 +3,7 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import (Callable, Collection, Generator, Iterable,
-                    Iterator,
+from typing import (Callable, Collection, Generator, Iterable, Iterator,
                     Optional, Type, Union)
 
 from requests import Response
