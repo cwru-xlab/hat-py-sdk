@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import ClassVar, Iterable, Optional, TypeVar
+from typing import ClassVar, Optional, TypeVar
 
 from . import errors
-from .client import HatClient, M, StringLike
+from .client import HatClient, Models, StringLike
 from .model import GetOpts, HatModel
 
 
@@ -30,7 +30,7 @@ class ActiveHatModel(HatModel):
         return self._client().delete(self)
 
     @classmethod
-    def delete_all(cls, models: M | Iterable[M]) -> None:
+    def delete_all(cls, models: Models) -> None:
         cls._client().delete(models)
 
     @classmethod

@@ -3,7 +3,8 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import (Callable, Collection, Generator, Iterable, Iterator,
+from typing import (Callable, Collection, Generator, Iterable,
+                    Iterator,
                     Optional, Type, Union)
 
 from requests import Response
@@ -16,6 +17,7 @@ from .utils import OnError, SessionMixin
 StringLike = Union[str, HatModel]
 IStringLike = Iterable[StringLike]
 MTypes = Iterable[Type[M]]
+Models = Union[M, Iterator[M], Collection[M]]
 
 
 def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
@@ -106,7 +108,7 @@ class HatClient(SessionMixin):
 
     @ensure_iterable
     @requires_namespace
-    def post(self, models: M | Iterable[M]) -> list[M]:
+    def post(self, models: Models) -> list[M]:
         posted = []
         for endpoint, models, mtypes in self._prepare_post(models):
             res = self._endpoint_request("POST", endpoint, data=models)
@@ -114,7 +116,7 @@ class HatClient(SessionMixin):
         return posted
 
     @ensure_iterable
-    def put(self, models: M | Iterable[M]) -> list[M]:
+    def put(self, models: Models) -> list[M]:
         put = self._prepare_put(models)
         res = self._data_request("PUT", data=put)
         return get_models(res, errors.put_error, types(models))
