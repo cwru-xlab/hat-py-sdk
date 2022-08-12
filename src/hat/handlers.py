@@ -8,7 +8,7 @@ import orjson
 from aiohttp import ClientResponse, ClientResponseError
 from requests import HTTPError, Response
 
-from . import errors, urls, tokens
+from . import errors, tokens, urls
 from .backend import AsyncHandler, SyncHandler
 from .base import Handler
 from .model import HatRecord, M
@@ -68,11 +68,13 @@ class HatHandler(Handler):
 
 class SyncHatHandler(SyncHandler, HatHandler):
 
-    def on_success(self, response: Response, **kwargs) -> str | list[M]:
+    def on_success(self, response: Response, **kwargs) -> str | list[M] | None:
         if pk_endpoint(url := response.url):
             return response.text
         elif token_endpoint(url):
             return orjson.loads(response.content)[tokens.TOKEN_KEY]
+        elif response.request.method.lower() == "delete":
+            return None
         elif api_endpoint(url):
             return HatRecord.parse(response.content, kwargs["mtypes"])
         else:
@@ -94,11 +96,13 @@ class SyncHatHandler(SyncHandler, HatHandler):
 class AsyncHatHandler(AsyncHandler, HatHandler):
 
     async def on_success(
-            self, response: ClientResponse, **kwargs) -> str | list[M]:
+            self, response: ClientResponse, **kwargs) -> str | list[M] | None:
         if pk_endpoint(url := str(response.url)):
             return await response.text()
         elif token_endpoint(url):
             return orjson.loads(await response.read())[tokens.TOKEN_KEY]
+        elif response.method.lower() == "delete":
+            return None
         elif api_endpoint(url):
             return HatRecord.parse(await response.read(), kwargs["mtypes"])
         else:
