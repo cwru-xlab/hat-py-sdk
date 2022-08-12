@@ -5,23 +5,18 @@ from typing import Any
 
 
 class Handler(abc.ABC):
-    __slots__ = ()
 
     @abc.abstractmethod
-    def on_success(self, response: Any) -> Any:
+    def on_success(self, response: Any, **kwargs) -> Any:
         pass
 
     @abc.abstractmethod
-    def on_error(self, error: BaseException) -> Any:
+    def on_error(self, error: BaseException, **kwargs) -> Any:
         pass
 
 
 class HttpClient(abc.ABC):
-    __slots__ = ()
-
-    def __init__(self):
-        super().__init__()
 
     @abc.abstractmethod
-    def request(self, method: str, url: str, **kwargs):
+    def request(self, method: str, url: str, **kwargs) -> Any:
         pass

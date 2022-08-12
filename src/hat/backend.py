@@ -10,10 +10,6 @@ from base import Handler, HttpClient
 
 
 class SyncHandler(Handler):
-    __slots__ = ()
-
-    def __init__(self) -> None:
-        super().__init__()
 
     def on_success(self, response: Response, **kwargs) -> Any:
         return response
@@ -23,10 +19,6 @@ class SyncHandler(Handler):
 
 
 class AsyncHandler(Handler):
-    __slots__ = ()
-
-    def __init__(self) -> None:
-        super().__init__()
 
     async def on_success(self, response: ClientResponse, **kwargs) -> Any:
         return response
@@ -40,14 +32,8 @@ class SyncHttpClient(HttpClient, AbstractContextManager):
 
     def __init__(self, session: Session, handler: Optional[SyncHandler] = None):
         super().__init__()
-        self.handler = self._check_handler(handler) or SyncHandler()
+        self.handler = handler or SyncHandler()
         self._session = session
-
-    @staticmethod
-    def _check_handler(handler: SyncHandler) -> SyncHandler:
-        if not isinstance(handler, SyncHandler):
-            raise TypeError("'handler' must be a SyncHandler")
-        return handler
 
     def request(self, method: str, url: str, **kwargs) -> Any:
         response = self._session.request(method=method, url=url, **kwargs)
@@ -77,14 +63,8 @@ class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
             session: ClientSession,
             handler: Optional[AsyncHandler] = None):
         super().__init__()
-        self.handler = self._check_handler(handler) or AsyncHandler()
+        self.handler = handler or AsyncHandler()
         self._session = session
-
-    @staticmethod
-    def _check_handler(handler: AsyncHandler) -> AsyncHandler:
-        if not isinstance(handler, AsyncHandler):
-            raise TypeError("'handler' must be an AsyncHandler")
-        return handler
 
     async def request(self, method: str, url: str, **kwargs):
         kwargs["raise_for_status"] = True

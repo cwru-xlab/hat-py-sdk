@@ -15,6 +15,7 @@ from .model import ApiConfig
 from .utils import SessionMixin
 
 JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
+TOKEN_KEY = "accessToken"
 
 
 class JwtToken(BaseModel):
@@ -91,7 +92,7 @@ class Token(SessionMixin, abc.ABC):
     def value(self) -> str:
         if self._value is None or self.expired:
             res = self._session.get(url=self.url, auth=self.auth)
-            self.value = utils.get_json(res, errors.auth_error)["accessToken"]
+            self.value = utils.get_json(res, errors.auth_error)[TOKEN_KEY]
         return self._value
 
     @value.setter
@@ -223,13 +224,13 @@ class TokenAuth(auth.AuthBase):
         self._token = token
 
     def __call__(self, request: PreparedRequest) -> PreparedRequest:
-        request.headers[utils.TOKEN_KEY] = self._token.value
+        request.headers[utils.TOKEN_HEADER] = self._token.value
         request.hooks["response"].append(self._on_response)
         return request
 
     def _on_response(self, res: Response, **kwargs) -> Response:
-        if utils.TOKEN_KEY in res.headers:
-            self._token.value = res.headers[utils.TOKEN_KEY]
+        if utils.TOKEN_HEADER in res.headers:
+            self._token.value = res.headers[utils.TOKEN_HEADER]
         return res
 
     def __repr__(self) -> str:

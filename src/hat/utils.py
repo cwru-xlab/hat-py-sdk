@@ -12,7 +12,7 @@ from requests_cache.backends import base
 from . import errors, urls
 
 JSON_MIMETYPE = "application/json"
-TOKEN_KEY = "x-auth-token"
+TOKEN_HEADER = "x-auth-token"
 
 OnSuccess = Callable[[Response], Any]
 OnError = Callable[[int, Any], Type[Exception]]

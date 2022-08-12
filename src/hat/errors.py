@@ -134,6 +134,21 @@ delete_errors = ErrorMapping(DeleteError)
 delete_errors.update(crud_errors)
 delete_errors.put(400, RecordNotFoundError)
 
+errors: dict[str, ErrorMapping] = {
+    "auth": auth_errors,
+    "get": get_errors,
+    "post": post_errors,
+    "put": put_errors,
+    "delete": delete_errors}
+
+
+def find_error(kind: str, status: int, content: Any) -> Type[HatError]:
+    if (key := kind.lower().strip()) in errors:
+        return errors[key].get(status, content)
+    else:
+        raise ValueError(
+            f"'kind' must be one of {list(errors.keys())}; got {kind}")
+
 
 def auth_error(status: int, content: Any) -> Type[AuthError]:
     return auth_errors.get(status, content)
