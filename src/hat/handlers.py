@@ -6,12 +6,14 @@ from typing import Any
 
 import orjson
 from aiohttp import ClientResponse, ClientResponseError
+from keyring.credentials import Credential
 from requests import HTTPError, Response
 
-from . import errors, tokens, urls
+from . import errors, tokens, urls, utils
 from .backend import AsyncResponseHandler, SyncResponseHandler
-from .base import ResponseHandler
+from .base import AuthHandler, ResponseHandler
 from .model import HatRecord, M
+from .tokens import Token
 
 
 def pk_endpoint(url: str) -> bool:
@@ -122,3 +124,30 @@ class AsyncHatResponseHandler(AsyncResponseHandler, HatResponseHandler):
 
     def content(self, error: ClientResponseError) -> dict[str, Any]:
         return orjson.loads(error.message)
+
+
+class TokenAuthHandler(AuthHandler):
+    __slots__ = "_token"
+
+    def __init__(self, token: Token):
+        self._token = token
+
+    def headers(self) -> dict[str, str]:
+        return {utils.TOKEN_HEADER: self._token.value}
+
+    def on_response(self, response: Response | ClientResponse) -> None:
+        if utils.TOKEN_HEADER in response.headers:
+            self._token.value = response.headers[utils.TOKEN_HEADER]
+
+
+class CredentialAuthHandler(AuthHandler):
+    __slots__ = "_credential",
+
+    def __init__(self, credential: Credential):
+        self._credential = credential
+
+    def headers(self) -> dict[str, str]:
+        return {
+            "Accept": utils.JSON_MIMETYPE,
+            "username": self._credential.username,
+            "password": self._credential.password}
