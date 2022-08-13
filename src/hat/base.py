@@ -10,7 +10,7 @@ class SupportsContent(Protocol):
     content: Any
 
 
-class ResponseHandler(abc.ABC):
+class BaseResponseHandler(abc.ABC):
 
     def on_success(self, response: SupportsContent, **kwargs) -> Any:
         raise ValueError(f"Unable to process response: {response.content}")
@@ -53,7 +53,7 @@ class HttpAuth:
         pass
 
 
-class HttpClient(abc.ABC):
+class BaseHttpClient(abc.ABC):
 
     @abc.abstractmethod
     def request(
@@ -67,4 +67,18 @@ class HttpClient(abc.ABC):
 
     @abc.abstractmethod
     def close(self) -> None:
+        pass
+
+
+class Cachable(abc.ABC):
+
+    @abc.abstractmethod
+    def clear_cache(self) -> None:
+        pass
+
+
+class AsyncCachable(Cachable, abc.ABC):
+
+    @abc.abstractmethod
+    async def clear_cache(self) -> None:
         pass
