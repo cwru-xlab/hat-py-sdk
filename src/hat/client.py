@@ -102,7 +102,7 @@ class HttpClient(BaseHttpClient, Cachable, AbstractContextManager):
             **kwargs
     ) -> Any:
         auth = auth or self.auth
-        kwargs = self._prepare_request(auth, kwargs)
+        kwargs = self._prepare_request(auth, **kwargs)
         response = self.session.request(method, url, **kwargs)
         try:
             response.raise_for_status()
@@ -115,8 +115,7 @@ class HttpClient(BaseHttpClient, Cachable, AbstractContextManager):
             response.close()
         return result
 
-    def _prepare_request(
-            self, auth: HttpAuth, kwargs: dict[str, Any]) -> dict[str, Any]:
+    def _prepare_request(self, auth: HttpAuth, kwargs: Any) -> dict[str, Any]:
         kwargs.update({"headers": auth.headers})
         return utils.match_signature(self.session.request, **kwargs)
 

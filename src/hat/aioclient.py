@@ -7,11 +7,12 @@ from aiohttp import ClientResponse, ClientResponseError, ClientSession
 from aiohttp_client_cache import CachedSession
 
 from . import sessions, tokens, urls, utils
-from .base import AsyncCachable, HttpAuth, BaseHttpClient, BaseResponseHandler
+from .base import AsyncCachable, BaseHttpClient, BaseResponseHandler, HttpAuth
 from .model import HatRecord, M
 
 
-class AsyncHttpClient(BaseHttpClient, AsyncCachable, AbstractAsyncContextManager):
+class AsyncHttpClient(BaseHttpClient, AsyncCachable,
+                      AbstractAsyncContextManager):
     __slots__ = "session", "handler", "auth"
 
     def __init__(
@@ -38,7 +39,7 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable, AbstractAsyncContextManager
             **kwargs
     ) -> Any:
         auth = auth or self.auth
-        kwargs = self._prepare_request(auth, kwargs)
+        kwargs = self._prepare_request(auth, **kwargs)
         try:
             response = await self.session.request(method, url, **kwargs)
             auth.on_response(response)
@@ -50,8 +51,7 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable, AbstractAsyncContextManager
             response.close()
         return result
 
-    def _prepare_request(
-            self, auth: HttpAuth, kwargs: dict[str, Any]) -> dict[str, Any]:
+    def _prepare_request(self, auth: HttpAuth, **kwargs: Any) -> dict[str, Any]:
         kwargs.update({"headers": auth.headers})
         kwargs["raise_for_status"] = False
         return utils.match_signature(self.session.request, **kwargs)
