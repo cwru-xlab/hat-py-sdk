@@ -4,25 +4,31 @@ from contextlib import AbstractAsyncContextManager
 from typing import Any, Mapping, Optional
 
 from aiohttp import ClientResponse, ClientResponseError, ClientSession
+from aiohttp_client_cache import CachedSession
 
-from . import tokens, urls, utils
-from .base import HttpAuth, HttpClient, ResponseHandler
+from . import sessions, tokens, urls, utils
+from .base import AsyncCachable, HttpAuth, BaseHttpClient, BaseResponseHandler
 from .model import HatRecord, M
 
 
-class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
-    __slots__ = "handler", "auth", "_session"
+class AsyncHttpClient(BaseHttpClient, AsyncCachable, AbstractAsyncContextManager):
+    __slots__ = "session", "handler", "auth"
 
     def __init__(
             self,
-            session: ClientSession,
+            session: Optional[ClientSession] = None,
             handler: Optional[AsyncResponseHandler] = None,
-            auth: Optional[HttpAuth] = None
+            auth: Optional[HttpAuth] = None,
+            **kwargs
     ) -> None:
         super().__init__()
+        self.session = session or self._new_session(**kwargs)
         self.handler = handler or AsyncResponseHandler()
         self.auth = auth or HttpAuth()
-        self._session = session
+
+    @staticmethod
+    def _new_session(**kwargs) -> ClientSession:
+        return CachedSession(**sessions.DEFAULTS | kwargs)
 
     async def request(
             self,
@@ -32,10 +38,9 @@ class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
             **kwargs
     ) -> Any:
         auth = auth or self.auth
-        kwargs.update({"headers": auth.headers})
-        kwargs["raise_for_status"] = False
+        kwargs = self._prepare_request(auth, kwargs)
         try:
-            response = await self._session.request(method, url, **kwargs)
+            response = await self.session.request(method, url, **kwargs)
             auth.on_response(response)
             response.raise_for_status()
         except ClientResponseError as error:
@@ -45,18 +50,28 @@ class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
             response.close()
         return result
 
+    def _prepare_request(
+            self, auth: HttpAuth, kwargs: dict[str, Any]) -> dict[str, Any]:
+        kwargs.update({"headers": auth.headers})
+        kwargs["raise_for_status"] = False
+        return utils.match_signature(self.session.request, **kwargs)
+
     async def close(self) -> None:
-        return await self._session.close()
+        return await self.session.close()
+
+    async def clear_cache(self) -> None:
+        if isinstance(self.session, CachedSession):
+            return await self.session.cache.clear()
 
     async def __aenter__(self) -> AsyncHttpClient:
-        async with self._session:
+        async with self.session:
             return self
 
     async def __aexit__(self, *args) -> None:
-        return await self._session.__aexit__(*args)
+        return await self.session.__aexit__(*args)
 
 
-class AsyncResponseHandler(ResponseHandler):
+class AsyncResponseHandler(BaseResponseHandler):
 
     async def on_success(
             self, response: ClientResponse, **kwargs) -> str | list[M] | None:

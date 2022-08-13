@@ -7,14 +7,13 @@ from contextlib import AbstractContextManager
 from typing import (Any, Callable, Collection, Generator, Iterable, Iterator,
                     Mapping, Optional, Type, Union)
 
-import orjson
 from requests import HTTPError, Response, Session
+from requests_cache import CachedSession
 
-from . import errors, tokens, urls, utils
-from .base import HttpAuth, HttpClient, ResponseHandler
+from . import errors, sessions, tokens, urls, utils
+from .base import Cachable, HttpAuth, BaseHttpClient, BaseResponseHandler
 from .model import GetOpts, HatModel, HatRecord, M
-from .tokens import Token, TokenAuth
-from .utils import OnError, SessionMixin
+from .tokens import Token
 
 StringLike = Union[str, HatModel]
 IStringLike = Iterable[StringLike]
@@ -28,7 +27,8 @@ def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
     return ((endpoint, list(models)) for endpoint, models in groups)
 
 
-def get_models(res: Response, on_error: OnError, mtypes: MTypes) -> list[M]:
+def get_models(
+        res: Response, on_error: utils.OnError, mtypes: MTypes) -> list[M]:
     return utils.handle(
         res, lambda r: HatRecord.parse(r.content, mtypes), on_error)
 
@@ -72,19 +72,27 @@ def ensure_iterable(method: Callable) -> Callable:
     return wrapper
 
 
-class SyncHttpClient(HttpClient, AbstractContextManager):
-    __slots__ = "handler", "auth", "_session"
+class HttpClient(BaseHttpClient, Cachable, AbstractContextManager):
+    __slots__ = "session", "handler", "auth"
 
     def __init__(
             self,
-            session: Session,
-            handler: Optional[SyncResponseHandler] = None,
-            auth: Optional[HttpAuth] = None
+            session: Optional[Session] = None,
+            handler: Optional[ResponseHandler] = None,
+            auth: Optional[HttpAuth] = None,
+            **kwargs
     ) -> None:
         super().__init__()
-        self.handler = handler or SyncResponseHandler()
+        self.session = session or self._new_session(**kwargs)
+        self.handler = handler or ResponseHandler()
         self.auth = auth or HttpAuth()
-        self._session = session
+
+    @staticmethod
+    def _new_session(**kwargs) -> Session:
+        session = CachedSession(**sessions.DEFAULTS | kwargs)
+        session.headers = sessions.DEFAULTS["headers"]
+        session.stream = True
+        return session
 
     def request(
             self,
@@ -94,8 +102,8 @@ class SyncHttpClient(HttpClient, AbstractContextManager):
             **kwargs
     ) -> Any:
         auth = auth or self.auth
-        kwargs.update({"headers": auth.headers})
-        response = self._session.request(method=method, url=url, **kwargs)
+        kwargs = self._prepare_request(auth, kwargs)
+        response = self.session.request(method, url, **kwargs)
         try:
             response.raise_for_status()
         except HTTPError as error:
@@ -107,18 +115,27 @@ class SyncHttpClient(HttpClient, AbstractContextManager):
             response.close()
         return result
 
-    def close(self) -> None:
-        self._session.close()
+    def _prepare_request(
+            self, auth: HttpAuth, kwargs: dict[str, Any]) -> dict[str, Any]:
+        kwargs.update({"headers": auth.headers})
+        return utils.match_signature(self.session.request, **kwargs)
 
-    def __enter__(self) -> SyncHttpClient:
-        with self._session:
+    def close(self) -> None:
+        self.session.close()
+
+    def clear_cache(self) -> None:
+        if isinstance(self.session, CachedSession):
+            return self.session.cache.clear()
+
+    def __enter__(self) -> HttpClient:
+        with self.session:
             return self
 
     def __exit__(self, *args) -> None:
-        return self._session.__exit__(*args)
+        return self.session.__exit__(*args)
 
 
-class SyncResponseHandler(ResponseHandler):
+class ResponseHandler(BaseResponseHandler):
 
     def on_success(self, response: Response, **kwargs) -> str | list[M] | None:
         if urls.is_pk_endpoint(url := response.url):
@@ -145,7 +162,7 @@ class SyncResponseHandler(ResponseHandler):
         return utils.loads(error.response.content)
 
 
-class HatClient(SessionMixin):
+class HatClient(utils.SessionMixin):
     __slots__ = "_token", "_auth", "_namespace", "_pattern"
 
     def __init__(
@@ -156,7 +173,7 @@ class HatClient(SessionMixin):
             **kwargs):
         super().__init__(token._session if share_session else None, **kwargs)
         self._token = token
-        self._auth = TokenAuth(token)
+        self._auth = tokens.TokenAuth(token)
         self._namespace = namespace
         self._pattern = re.compile(rf"^{namespace}/")
 
