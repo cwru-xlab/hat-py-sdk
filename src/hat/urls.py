@@ -67,6 +67,26 @@ def no_scheme(pattern: str) -> re.Pattern:
     return re.compile(rf".*{SCHEME_PATTERN.split(pattern)[-1]}$")
 
 
+def is_pk_endpoint(url: str) -> bool:
+    return matched(url, PK_PATTERN)
+
+
+def is_auth_endpoint(url: str) -> bool:
+    return is_pk_endpoint(url) or is_token_endpoint(url)
+
+
+def is_token_endpoint(url: str) -> bool:
+    return matched(url, OWNER_TOKEN_PATTERN, APP_TOKEN_PATTERN)
+
+
+def is_api_endpoint(url: str) -> bool:
+    return matched(url, DATA_PATTERN, ENDPOINT_PATTERN)
+
+
+def matched(url: str, *patterns: re.Pattern) -> bool:
+    return any(p.match(url) is not None for p in patterns)
+
+
 API_VERSION = "v2.6"
 SCHEME = "https"
 

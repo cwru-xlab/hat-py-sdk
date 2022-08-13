@@ -3,12 +3,15 @@ from __future__ import annotations
 import functools
 import itertools
 import re
-from typing import (Callable, Collection, Generator, Iterable, Iterator,
-                    Optional, Type, Union)
+from contextlib import AbstractContextManager
+from typing import (Any, Callable, Collection, Generator, Iterable, Iterator,
+                    Mapping, Optional, Type, Union)
 
-from requests import Response
+import orjson
+from requests import HTTPError, Response, Session
 
-from . import errors, urls, utils
+from . import errors, tokens, urls, utils
+from .base import AuthHandler, HttpClient, ResponseHandler
 from .model import GetOpts, HatModel, HatRecord, M
 from .tokens import Token, TokenAuth
 from .utils import OnError, SessionMixin
@@ -67,6 +70,79 @@ def ensure_iterable(method: Callable) -> Callable:
         return method(self, iterable, *args, **kwargs)
 
     return wrapper
+
+
+class SyncHttpClient(HttpClient, AbstractContextManager):
+    __slots__ = "response_handler", "auth_handler", "_session"
+
+    def __init__(
+            self,
+            session: Session,
+            response_handler: Optional[SyncResponseHandler] = None,
+            auth_handler: Optional[AuthHandler] = None
+    ) -> None:
+        super().__init__()
+        self.response_handler = response_handler or SyncResponseHandler()
+        self.auth_handler = auth_handler or AuthHandler()
+        self._session = session
+
+    def request(
+            self,
+            method: str,
+            url: str,
+            auth: Optional[AuthHandler] = None,
+            **kwargs
+    ) -> Any:
+        auth = auth or self.auth_handler
+        kwargs.update({"headers": auth.headers()})
+        response = self._session.request(method=method, url=url, **kwargs)
+        try:
+            response.raise_for_status()
+        except HTTPError as error:
+            result = self.response_handler.on_error(error, **kwargs)
+        else:
+            result = self.response_handler.on_success(response, **kwargs)
+        finally:
+            auth.on_response(response)
+            response.close()
+        return result
+
+    def close(self) -> None:
+        self._session.close()
+
+    def __enter__(self) -> SyncHttpClient:
+        with self._session:
+            return self
+
+    def __exit__(self, *args) -> None:
+        return self._session.__exit__(*args)
+
+
+class SyncResponseHandler(ResponseHandler):
+
+    def on_success(self, response: Response, **kwargs) -> str | list[M] | None:
+        if urls.is_pk_endpoint(url := response.url):
+            return response.text
+        elif urls.is_token_endpoint(url):
+            return orjson.loads(response.content)[tokens.TOKEN_KEY]
+        elif response.request.method.lower() == "delete":
+            return None
+        elif urls.is_api_endpoint(url):
+            return HatRecord.parse(response.content, kwargs["mtypes"])
+        else:
+            return super().on_success(response)
+
+    def status(self, error: HTTPError) -> int:
+        return error.response.status_code
+
+    def url(self, error: HTTPError) -> str:
+        return error.response.url
+
+    def method(self, error: HTTPError) -> str:
+        return error.request.method.lower()
+
+    def content(self, error: HTTPError) -> Mapping[str, str]:
+        return orjson.loads(error.response.content)
 
 
 class HatClient(SessionMixin):
