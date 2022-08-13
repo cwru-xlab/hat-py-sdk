@@ -4,7 +4,6 @@ from abc import ABC
 from enum import Enum
 from typing import Any, AnyStr, Generic, Iterable, Optional, Type, TypeVar
 
-import orjson
 import pydantic
 import ulid
 from humps import camel
@@ -12,17 +11,14 @@ from pydantic import (BaseConfig, BaseModel, Field, NonNegativeInt, StrictStr,
                       conint, constr)
 from pydantic.generics import GenericModel
 
-
-def orjson_dumps(value: Any, **kwargs) -> str:
-    # Ref: https://pydantic-docs.helpmanual.io/usage/exporting_models
-    return orjson.dumps(value, **kwargs).decode()
+from . import utils
 
 
 class HatConfig(BaseConfig):
     allow_population_by_field_name = True
     use_enum_values = True
-    json_dumps = orjson_dumps
-    json_loads = orjson.loads
+    json_dumps = utils.dumps
+    json_loads = utils.loads
 
 
 class ApiConfig(HatConfig):

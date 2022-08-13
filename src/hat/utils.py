@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import datetime
 import mimetypes
-from typing import Any, Callable, Optional, Type
+from typing import Any, AnyStr, Callable, Optional, Type
 
 import requests
 import requests_cache
@@ -11,6 +11,26 @@ from requests import Response
 from requests_cache.backends import base
 
 from . import errors, urls
+
+try:
+    import orjson as json
+
+
+    def dumps(obj: Any, **kwargs) -> str:
+        # Ref: https://pydantic-docs.helpmanual.io/usage/exporting_models
+        return json.dumps(obj, **kwargs).decode()
+
+
+except ImportError:
+    import json
+
+
+    def dumps(obj, **kwargs):
+        return json.dumps(obj, **kwargs)
+
+finally:
+    def loads(obj: AnyStr, **kwargs) -> dict[str, Any]:
+        return json.loads(obj, **kwargs)
 
 OnSuccess = Callable[[Response], Any]
 OnError = Callable[[int, Any], Type[Exception]]

@@ -4,9 +4,8 @@ from contextlib import AbstractAsyncContextManager
 from typing import Any, Mapping, Optional
 
 from aiohttp import ClientResponse, ClientResponseError, ClientSession
-from orjson import orjson
 
-from . import tokens, urls
+from . import tokens, urls, utils
 from .base import HttpAuth, HttpClient, ResponseHandler
 from .model import HatRecord, M
 
@@ -64,7 +63,7 @@ class AsyncResponseHandler(ResponseHandler):
         if urls.is_pk_endpoint(url := str(response.url)):
             return await response.text()
         elif urls.is_token_endpoint(url):
-            return orjson.loads(await response.read())[tokens.TOKEN_KEY]
+            return utils.loads(await response.read())[tokens.TOKEN_KEY]
         elif response.method.lower() == "delete":
             return None
         elif urls.is_api_endpoint(url):
@@ -85,4 +84,4 @@ class AsyncResponseHandler(ResponseHandler):
         return error.request_info.method.lower()
 
     def content(self, error: ClientResponseError) -> Mapping[str, str]:
-        return orjson.loads(error.message)
+        return utils.loads(error.message)

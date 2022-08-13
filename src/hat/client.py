@@ -124,7 +124,7 @@ class SyncResponseHandler(ResponseHandler):
         if urls.is_pk_endpoint(url := response.url):
             return response.text
         elif urls.is_token_endpoint(url):
-            return orjson.loads(response.content)[tokens.TOKEN_KEY]
+            return utils.loads(response.content)[tokens.TOKEN_KEY]
         elif response.request.method.lower() == "delete":
             return None
         elif urls.is_api_endpoint(url):
@@ -142,7 +142,7 @@ class SyncResponseHandler(ResponseHandler):
         return error.request.method.lower()
 
     def content(self, error: HTTPError) -> Mapping[str, str]:
-        return orjson.loads(error.response.content)
+        return utils.loads(error.response.content)
 
 
 class HatClient(SessionMixin):
