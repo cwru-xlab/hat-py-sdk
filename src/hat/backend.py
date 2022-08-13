@@ -6,10 +6,10 @@ from typing import Any, Optional
 from aiohttp import ClientResponse, ClientResponseError, ClientSession
 from requests import HTTPError, Response, Session
 
-from base import Handler, HttpClient
+from base import AuthHandler, HttpClient, ResponseHandler
 
 
-class SyncHandler(Handler):
+class SyncResponseHandler(ResponseHandler):
 
     def on_success(self, response: Response, **kwargs) -> Any:
         return response
@@ -18,7 +18,7 @@ class SyncHandler(Handler):
         raise error
 
 
-class AsyncHandler(Handler):
+class AsyncResponseHandler(ResponseHandler):
 
     async def on_success(self, response: ClientResponse, **kwargs) -> Any:
         return response
@@ -28,22 +28,37 @@ class AsyncHandler(Handler):
 
 
 class SyncHttpClient(HttpClient, AbstractContextManager):
-    __slots__ = "handler", "_session"
+    __slots__ = "response_handler", "auth_handler", "_session"
 
-    def __init__(self, session: Session, handler: Optional[SyncHandler] = None):
+    def __init__(
+            self,
+            session: Session,
+            response_handler: Optional[SyncResponseHandler] = None,
+            auth_handler: Optional[AuthHandler] = None
+    ) -> None:
         super().__init__()
-        self.handler = handler or SyncHandler()
+        self.response_handler = response_handler or SyncResponseHandler()
+        self.auth_handler = auth_handler or AuthHandler()
         self._session = session
 
-    def request(self, method: str, url: str, **kwargs) -> Any:
+    def request(
+            self,
+            method: str,
+            url: str,
+            auth: Optional[AuthHandler] = None,
+            **kwargs
+    ) -> Any:
+        auth = auth or self.auth_handler
+        kwargs.update({"headers": auth.headers()})
         response = self._session.request(method=method, url=url, **kwargs)
         try:
             response.raise_for_status()
         except HTTPError as error:
-            result = self.handler.on_error(error, **kwargs)
+            result = self.response_handler.on_error(error, **kwargs)
         else:
-            result = self.handler.on_success(response, **kwargs)
+            result = self.response_handler.on_success(response, **kwargs)
         finally:
+            auth.on_response(response)
             response.close()
         return result
 
@@ -56,25 +71,39 @@ class SyncHttpClient(HttpClient, AbstractContextManager):
 
 
 class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
-    __slots__ = "handler", "_session"
+    __slots__ = "response_handler", "auth_handler", "_session"
 
     def __init__(
             self,
             session: ClientSession,
-            handler: Optional[AsyncHandler] = None):
+            response_handler: Optional[AsyncResponseHandler] = None,
+            auth_handler: Optional[AuthHandler] = None
+    ) -> None:
         super().__init__()
-        self.handler = handler or AsyncHandler()
+        self.response_handler = response_handler or AsyncResponseHandler()
+        self.auth_handler = auth_handler or AuthHandler()
         self._session = session
 
-    async def request(self, method: str, url: str, **kwargs):
-        kwargs["raise_for_status"] = True
+    async def request(
+            self,
+            method: str,
+            url: str,
+            auth: Optional[AuthHandler] = None,
+            **kwargs
+    ) -> Any:
+        auth = auth or self.auth_handler
+        kwargs.update({"headers": auth.headers()})
+        # raise_for_status() closes the response, but it's needed for auth.
+        kwargs["raise_for_status"] = False
         try:
             response = await self._session.request(method, url, **kwargs)
+            auth.on_response(response)
+            response.raise_for_status()
         except ClientResponseError as error:
-            result = await self.handler.on_error(error, **kwargs)
+            result = await self.response_handler.on_error(error, **kwargs)
         else:
-            result = await self.handler.on_success(response, **kwargs)
-            response.close()  # raise_for_status() closes the response.
+            result = await self.response_handler.on_success(response, **kwargs)
+            response.close()
         return result
 
     async def __aenter__(self) -> AsyncHttpClient:

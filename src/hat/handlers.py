@@ -9,8 +9,8 @@ from aiohttp import ClientResponse, ClientResponseError
 from requests import HTTPError, Response
 
 from . import errors, tokens, urls
-from .backend import AsyncHandler, SyncHandler
-from .base import Handler
+from .backend import AsyncResponseHandler, SyncResponseHandler
+from .base import ResponseHandler
 from .model import HatRecord, M
 
 
@@ -34,7 +34,7 @@ def matched(url: str, *patterns: re.Pattern) -> bool:
     return any(p.match(url) is not None for p in patterns)
 
 
-class HatHandler(Handler):
+class HatResponseHandler(ResponseHandler):
 
     def on_success(self, response: Any, **kwargs) -> Any:
         raise ValueError(f"Unable to process response: {response.content}")
@@ -66,7 +66,7 @@ class HatHandler(Handler):
         pass
 
 
-class SyncHatHandler(SyncHandler, HatHandler):
+class SyncHatResponseHandler(SyncResponseHandler, HatResponseHandler):
 
     def on_success(self, response: Response, **kwargs) -> str | list[M] | None:
         if pk_endpoint(url := response.url):
@@ -78,7 +78,7 @@ class SyncHatHandler(SyncHandler, HatHandler):
         elif api_endpoint(url):
             return HatRecord.parse(response.content, kwargs["mtypes"])
         else:
-            return super(HatHandler, self).on_success(response)
+            return super(HatResponseHandler, self).on_success(response)
 
     def status(self, error: HTTPError) -> int:
         return error.response.status_code
@@ -93,7 +93,7 @@ class SyncHatHandler(SyncHandler, HatHandler):
         return orjson.loads(error.response.content)
 
 
-class AsyncHatHandler(AsyncHandler, HatHandler):
+class AsyncHatResponseHandler(AsyncResponseHandler, HatResponseHandler):
 
     async def on_success(
             self, response: ClientResponse, **kwargs) -> str | list[M] | None:
@@ -106,10 +106,10 @@ class AsyncHatHandler(AsyncHandler, HatHandler):
         elif api_endpoint(url):
             return HatRecord.parse(await response.read(), kwargs["mtypes"])
         else:
-            return super(HatHandler, self).on_success(response)
+            return super(HatResponseHandler, self).on_success(response)
 
     async def on_error(self, error: ClientResponseError, **kwargs) -> Any:
-        return super(HatHandler, self).on_error(error, **kwargs)
+        return super(HatResponseHandler, self).on_error(error, **kwargs)
 
     def status(self, error: ClientResponseError) -> int:
         return error.status
