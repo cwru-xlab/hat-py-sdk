@@ -62,6 +62,9 @@ class SyncHttpClient(HttpClient, AbstractContextManager):
             response.close()
         return result
 
+    def close(self) -> None:
+        self._session.close()
+
     def __enter__(self) -> SyncHttpClient:
         with self._session:
             return self
@@ -104,6 +107,9 @@ class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
             result = await self.response_handler.on_success(response, **kwargs)
             response.close()
         return result
+
+    async def close(self) -> None:
+        await self._session.close()
 
     async def __aenter__(self) -> AsyncHttpClient:
         async with self._session:

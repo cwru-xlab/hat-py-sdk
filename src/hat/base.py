@@ -36,3 +36,7 @@ class HttpClient(abc.ABC):
             **kwargs
     ) -> Any:
         pass
+
+    @abc.abstractmethod
+    def close(self) -> None:
+        pass
