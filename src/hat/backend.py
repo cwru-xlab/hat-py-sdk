@@ -93,7 +93,6 @@ class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
     ) -> Any:
         auth = auth or self.auth_handler
         kwargs.update({"headers": auth.headers()})
-        # raise_for_status() closes the response, but it's needed for auth.
         kwargs["raise_for_status"] = False
         try:
             response = await self._session.request(method, url, **kwargs)
