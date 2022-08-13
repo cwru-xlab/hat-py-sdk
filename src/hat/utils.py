@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+import inspect
 import mimetypes
 from typing import Any, AnyStr, Callable, Optional, Type
 
@@ -34,6 +35,11 @@ finally:
 
 OnSuccess = Callable[[Response], Any]
 OnError = Callable[[int, Any], Type[Exception]]
+
+
+def match_signature(obj: Callable, **kwargs) -> dict[str, Any]:
+    allowed = inspect.signature(obj).parameters
+    return {k: v for k, v in kwargs.items() if k in allowed}
 
 
 def get_json(res: Response, on_error: OnError) -> dict | list:
