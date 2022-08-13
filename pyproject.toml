@@ -21,6 +21,7 @@ python-ulid = "^1.1.0"
 orjson = "^3.7.11"
 requests-cache = "^0.9.5"
 aiohttp = {extras = ["speedups"], version = "^3.8.1"}
+aiohttp-client-cache = "^0.7.3"
 
 [tool.poetry.dev-dependencies]
 
