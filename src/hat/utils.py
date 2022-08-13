@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+import mimetypes
 from typing import Any, Callable, Optional, Type
 
 import requests
@@ -10,9 +11,6 @@ from requests import Response
 from requests_cache.backends import base
 
 from . import errors, urls
-
-JSON_MIMETYPE = "application/json"
-TOKEN_HEADER = "x-auth-token"
 
 OnSuccess = Callable[[Response], Any]
 OnError = Callable[[int, Any], Type[Exception]]
@@ -56,7 +54,7 @@ class SessionMixin(contextlib.AbstractContextManager):
                 urls.domain_owner_token("*"): requests_cache.DO_NOT_CACHE,
                 urls.domain_app_token("*", "*"): requests_cache.DO_NOT_CACHE})
         session.stream = True
-        session.headers["Content-Type"] = JSON_MIMETYPE
+        session.headers["Content-Type"] = mimetypes.types_map[".json"]
         return session
 
     def __enter__(self):

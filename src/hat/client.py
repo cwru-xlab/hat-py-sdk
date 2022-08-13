@@ -11,7 +11,7 @@ import orjson
 from requests import HTTPError, Response, Session
 
 from . import errors, tokens, urls, utils
-from .base import AuthHandler, HttpClient, ResponseHandler
+from .base import HttpAuth, HttpClient, ResponseHandler
 from .model import GetOpts, HatModel, HatRecord, M
 from .tokens import Token, TokenAuth
 from .utils import OnError, SessionMixin
@@ -73,35 +73,35 @@ def ensure_iterable(method: Callable) -> Callable:
 
 
 class SyncHttpClient(HttpClient, AbstractContextManager):
-    __slots__ = "response_handler", "auth_handler", "_session"
+    __slots__ = "handler", "auth", "_session"
 
     def __init__(
             self,
             session: Session,
-            response_handler: Optional[SyncResponseHandler] = None,
-            auth_handler: Optional[AuthHandler] = None
+            handler: Optional[SyncResponseHandler] = None,
+            auth: Optional[HttpAuth] = None
     ) -> None:
         super().__init__()
-        self.response_handler = response_handler or SyncResponseHandler()
-        self.auth_handler = auth_handler or AuthHandler()
+        self.handler = handler or SyncResponseHandler()
+        self.auth = auth or HttpAuth()
         self._session = session
 
     def request(
             self,
             method: str,
             url: str,
-            auth: Optional[AuthHandler] = None,
+            auth: Optional[HttpAuth] = None,
             **kwargs
     ) -> Any:
-        auth = auth or self.auth_handler
-        kwargs.update({"headers": auth.headers()})
+        auth = auth or self.auth
+        kwargs.update({"headers": auth.headers})
         response = self._session.request(method=method, url=url, **kwargs)
         try:
             response.raise_for_status()
         except HTTPError as error:
-            result = self.response_handler.on_error(error, **kwargs)
+            result = self.handler.on_error(error, **kwargs)
         else:
-            result = self.response_handler.on_success(response, **kwargs)
+            result = self.handler.on_success(response, **kwargs)
         finally:
             auth.on_response(response)
             response.close()

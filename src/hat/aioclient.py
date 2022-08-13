@@ -7,42 +7,42 @@ from aiohttp import ClientResponse, ClientResponseError, ClientSession
 from orjson import orjson
 
 from . import tokens, urls
-from .base import AuthHandler, HttpClient, ResponseHandler
+from .base import HttpAuth, HttpClient, ResponseHandler
 from .model import HatRecord, M
 
 
 class AsyncHttpClient(HttpClient, AbstractAsyncContextManager):
-    __slots__ = "response_handler", "auth_handler", "_session"
+    __slots__ = "handler", "auth", "_session"
 
     def __init__(
             self,
             session: ClientSession,
-            response_handler: Optional[AsyncResponseHandler] = None,
-            auth_handler: Optional[AuthHandler] = None
+            handler: Optional[AsyncResponseHandler] = None,
+            auth: Optional[HttpAuth] = None
     ) -> None:
         super().__init__()
-        self.response_handler = response_handler or AsyncResponseHandler()
-        self.auth_handler = auth_handler or AuthHandler()
+        self.handler = handler or AsyncResponseHandler()
+        self.auth = auth or HttpAuth()
         self._session = session
 
     async def request(
             self,
             method: str,
             url: str,
-            auth: Optional[AuthHandler] = None,
+            auth: Optional[HttpAuth] = None,
             **kwargs
     ) -> Any:
-        auth = auth or self.auth_handler
-        kwargs.update({"headers": auth.headers()})
+        auth = auth or self.auth
+        kwargs.update({"headers": auth.headers})
         kwargs["raise_for_status"] = False
         try:
             response = await self._session.request(method, url, **kwargs)
             auth.on_response(response)
             response.raise_for_status()
         except ClientResponseError as error:
-            result = await self.response_handler.on_error(error, **kwargs)
+            result = await self.handler.on_error(error, **kwargs)
         else:
-            result = await self.response_handler.on_success(response, **kwargs)
+            result = await self.handler.on_success(response, **kwargs)
             response.close()
         return result
 

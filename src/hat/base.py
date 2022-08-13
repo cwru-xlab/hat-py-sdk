@@ -3,13 +3,7 @@ from __future__ import annotations
 import abc
 from typing import Any, Mapping, Optional, Protocol
 
-from keyring.credentials import Credential
-
-from . import Token, errors, urls, utils
-
-
-class SupportsHeaders(Protocol):
-    headers: Mapping[str, str]
+from . import errors, urls
 
 
 class SupportsContent(Protocol):
@@ -48,41 +42,15 @@ class ResponseHandler(abc.ABC):
         pass
 
 
-class AuthHandler:
+class HttpAuth:
     __slots__ = ()
 
+    @property
     def headers(self) -> Mapping[str, str]:
         return {}
 
     def on_response(self, response: Any) -> None:
         pass
-
-
-class TokenAuthHandler(AuthHandler):
-    __slots__ = "_token"
-
-    def __init__(self, token: Token):
-        self._token = token
-
-    def headers(self) -> Mapping[str, str]:
-        return {utils.TOKEN_HEADER: self._token.value}
-
-    def on_response(self, response: SupportsHeaders) -> None:
-        if utils.TOKEN_HEADER in response.headers:
-            self._token.value = response.headers[utils.TOKEN_HEADER]
-
-
-class CredentialAuthHandler(AuthHandler):
-    __slots__ = "_credential",
-
-    def __init__(self, credential: Credential):
-        self._credential = credential
-
-    def headers(self) -> Mapping[str, str]:
-        return {
-            "Accept": utils.JSON_MIMETYPE,
-            "username": self._credential.username,
-            "password": self._credential.password}
 
 
 class HttpClient(abc.ABC):
@@ -92,7 +60,7 @@ class HttpClient(abc.ABC):
             self,
             method: str,
             url: str,
-            auth: Optional[AuthHandler] = None,
+            auth: Optional[HttpAuth] = None,
             **kwargs
     ) -> Any:
         pass
