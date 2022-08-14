@@ -7,14 +7,14 @@ from typing import Any, Mapping, Optional, Protocol
 from . import errors, urls
 
 
-class UrlAndHeaders(Protocol):
+class SupportsUrlAndHeaders(Protocol):
     headers: Any
     url: Any
 
 
 class BaseResponseHandler(abc.ABC):
 
-    def on_success(self, response: UrlAndHeaders, **kwargs) -> Any:
+    def on_success(self, response: SupportsUrlAndHeaders, **kwargs) -> Any:
         url = str(response.url)
         headers = pprint.pformat(response.headers, indent=2)
         raise ValueError(f"Unable to process response for URL {url}\n{headers}")
