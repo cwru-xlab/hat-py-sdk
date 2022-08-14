@@ -11,7 +11,7 @@ from requests import HTTPError, Response, Session
 from requests_cache import CachedSession
 
 from . import errors, sessions, tokens, urls, utils
-from .base import Cachable, HttpAuth, BaseHttpClient, BaseResponseHandler
+from .base import BaseHttpClient, BaseResponseHandler, Cachable, HttpAuth
 from .model import GetOpts, HatModel, HatRecord, M
 from .tokens import Token
 
@@ -91,7 +91,7 @@ class HttpClient(BaseHttpClient, Cachable, AbstractContextManager):
     def _new_session(**kwargs) -> Session:
         session = CachedSession(**sessions.DEFAULTS | kwargs)
         session.headers = sessions.DEFAULTS["headers"]
-        session.stream = True
+        session.stream = sessions.DEFAULTS["stream"]
         return session
 
     def request(
