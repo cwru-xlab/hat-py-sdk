@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import abc
+import pprint
 from typing import Any, Mapping, Optional, Protocol
 
 from . import errors, urls
 
 
-class SupportsContent(Protocol):
-    content: Any
+class UrlAndHeaders(Protocol):
+    headers: Any
+    url: Any
 
 
 class BaseResponseHandler(abc.ABC):
 
-    def on_success(self, response: SupportsContent, **kwargs) -> Any:
-        raise ValueError(f"Unable to process response: {response.content}")
+    def on_success(self, response: UrlAndHeaders, **kwargs) -> Any:
+        url = str(response.url)
+        headers = pprint.pformat(response.headers, indent=2)
+        raise ValueError(f"Unable to process response for URL {url}\n{headers}")
 
     def on_error(self, error: BaseException, **kwargs) -> None:
         status, content = self.status(error), self.content(error)
