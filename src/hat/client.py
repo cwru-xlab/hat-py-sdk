@@ -13,10 +13,10 @@ from aiohttp import ClientResponse, ClientResponseError, ClientSession
 from aiohttp_client_cache import CacheBackend, CachedSession
 from asgiref import sync
 
-from . import Token, errors, tokens, urls, utils
-from .auth import TokenAuth
-from .base import AsyncCachable, BaseHatClient, BaseHttpClient, \
-    BaseResponseHandler, HttpAuth, IStringLike, Models, StringLike
+from . import AsyncApiToken, AsyncTokenAuth, auth as _auth, errors, urls, utils
+from .base import (AsyncCachable, BaseHatClient, BaseHttpClient,
+                   BaseResponseHandler, HttpAuth, IStringLike, Models,
+                   StringLike)
 from .model import GetOpts, HatModel, HatRecord, M
 
 MTypes = Iterable[Type[M]]
@@ -65,7 +65,7 @@ class AsyncResponseHandler(BaseResponseHandler):
         if urls.is_pk_endpoint(url := str(response.url)):
             return await response.text()
         elif urls.is_token_endpoint(url):
-            return utils.loads(await response.read())[tokens.TOKEN_KEY]
+            return utils.loads(await response.read())[_auth.TOKEN_KEY]
         elif response.method.lower() == "delete":
             await response.read()
             return None
@@ -154,12 +154,13 @@ class AsyncHatClient(BaseHatClient):
     def __init__(
             self,
             client: AsyncHttpClient,
-            token: Token,
+            token: AsyncApiToken,
             namespace: Optional[str] = None
     ) -> None:
         super().__init__(namespace)
         self.client = client
-        self.token = token
+        self._token = token
+        self._auth = AsyncTokenAuth(token)
 
     async def get(
             self,
@@ -187,11 +188,12 @@ class AsyncHatClient(BaseHatClient):
 
     async def _endpoint_request(
             self, method: str, endpoint: str, **kwargs) -> list[M]:
-        url = urls.domain_endpoint(self.token.domain, self.namespace, endpoint)
+        url = urls.domain_endpoint(
+            await self._token.domain(), self._namespace, endpoint)
         return await self._request(method, url, **kwargs)
 
     async def _data_request(self, method: str, **kwargs) -> list[M] | None:
-        url = urls.domain_data(self.token.domain)
+        url = urls.domain_data(await self._token.domain())
         return await self._request(method, url, **kwargs)
 
     async def _request(self, method: str, url: str, **kwargs) -> list[M] | None:
@@ -225,15 +227,6 @@ class AsyncHatClient(BaseHatClient):
             formatted.append(m)
         return HatRecord.to_json(formatted)
 
-    @property
-    def token(self) -> Token:
-        return self._token
-
-    @token.setter
-    def token(self, value: Token) -> None:
-        self._token = value
-        self._auth = TokenAuth(value)
-
     @staticmethod
     def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:
         record_ids = [
@@ -241,18 +234,22 @@ class AsyncHatClient(BaseHatClient):
             for r in require_record_id(record_ids)]
         return {"records": record_ids}
 
+    @property
+    def token(self) -> AsyncApiToken:
+        return self._token
+
     def to_sync(self) -> HatClient:
         return HatClient(self)
 
     def __repr__(self) -> str:
-        return utils.to_str(self, token=self.token, namespace=self._namespace)
+        return utils.to_str(self, token=self._token, namespace=self._namespace)
 
 
 class HatClient(BaseHatClient):
     __slots__ = "_wrapped"
 
     def __init__(self, wrapped: AsyncHatClient):
-        super().__init__(wrapped.namespace)
+        super().__init__(wrapped._namespace)
         self._wrapped = wrapped
 
     def get(

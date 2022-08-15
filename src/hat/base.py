@@ -46,7 +46,6 @@ class BaseResponseHandler(abc.ABC):
 class HttpAuth:
     __slots__ = ()
 
-    @property
     def headers(self) -> dict[str, str]:
         return {}
 
@@ -82,7 +81,8 @@ class BaseHatClient(abc.ABC):
     __slots__ = "_namespace", "_pattern"
 
     def __init__(self, namespace: Optional[str] = None):
-        self.namespace = namespace
+        self._namespace = namespace
+        self._pattern = re.compile(rf"^{namespace}/")
 
     @abc.abstractmethod
     @requires_namespace
@@ -111,10 +111,5 @@ class BaseHatClient(abc.ABC):
         pass
 
     @property
-    def namespace(self) -> str:
+    def namespace(self) -> Optional[str]:
         return self._namespace
-
-    @namespace.setter
-    def namespace(self, value: str) -> None:
-        self._namespace = value
-        self._pattern = re.compile(rf"^{value}/")

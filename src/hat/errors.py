@@ -148,23 +148,3 @@ def find_error(kind: str, status: int, content: Any) -> Type[HatError]:
     else:
         raise ValueError(
             f"'kind' must be one of {list(errors.keys())}; got {kind}")
-
-
-def auth_error(status: int, content: Any) -> Type[AuthError]:
-    return auth_errors.get(status, content)
-
-
-def get_error(status: int, content: Any) -> Type[GetError]:
-    return get_errors.get(status, content)
-
-
-def post_error(status: int, content: Any) -> Type[PostError]:
-    return post_errors.get(status, content)
-
-
-def put_error(status: int, content: Any) -> Type[PutError]:
-    return put_errors.get(status, content)
-
-
-def delete_error(status: int, content: Any) -> Type[DeleteError]:
-    return delete_errors.get(status, content)
