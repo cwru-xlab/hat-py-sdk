@@ -3,8 +3,8 @@ from __future__ import annotations
 import abc
 import functools
 import re
-from typing import (Any, Callable, Collection, Iterable, Iterator, Mapping,
-                    Optional, Type, Union)
+from typing import (Any, Callable, Collection, Iterable, Iterator, Optional,
+                    Type, Union)
 
 from .model import GetOpts, HatModel, M
 
