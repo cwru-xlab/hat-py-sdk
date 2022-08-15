@@ -89,7 +89,7 @@ class AsyncResponseHandler(BaseResponseHandler):
 
 class AsyncHttpClient(BaseHttpClient, AsyncCachable,
                       AbstractAsyncContextManager):
-    __slots__ = "session", "handler", "auth"
+    __slots__ = "_session", "_handler", "_auth"
 
     def __init__(
             self,
@@ -99,9 +99,9 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable,
             **kwargs
     ) -> None:
         super().__init__()
-        self.session = session or self._new_session(**kwargs)
-        self.handler = handler or AsyncResponseHandler()
-        self.auth = auth or HttpAuth()
+        self._session = session or self._new_session(**kwargs)
+        self._handler = handler or AsyncResponseHandler()
+        self._auth = auth or HttpAuth()
 
     @staticmethod
     def _new_session(**kwargs) -> ClientSession:
@@ -115,37 +115,37 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable,
             auth: Optional[HttpAuth] = None,
             **kwargs
     ) -> Any:
-        auth = auth or self.auth
+        auth = auth or self._auth
         kwargs = self._prepare_request(auth, **kwargs)
         try:
-            response = await self.session.request(method, url, **kwargs)
+            response = await self._session.request(method, url, **kwargs)
             auth.on_response(response)
             response.raise_for_status()
         except ClientResponseError as error:
-            result = await self.handler.on_error(error, **kwargs)
+            result = await self._handler.on_error(error, **kwargs)
         else:
-            result = await self.handler.on_success(response, **kwargs)
+            result = await self._handler.on_success(response, **kwargs)
             response.close()
         return result
 
     def _prepare_request(self, auth: HttpAuth, **kwargs: Any) -> dict[str, Any]:
         kwargs.update({"headers": auth.headers})
         kwargs["raise_for_status"] = False
-        return utils.match_signature(self.session.request, **kwargs)
+        return utils.match_signature(self._session.request, **kwargs)
 
     async def close(self) -> None:
-        return await self.session.close()
+        return await self._session.close()
 
     async def clear_cache(self) -> None:
-        if isinstance(self.session, CachedSession):
-            return await self.session.cache.clear()
+        if isinstance(self._session, CachedSession):
+            return await self._session.cache.clear()
 
     async def __aenter__(self) -> AsyncHttpClient:
-        async with self.session:
+        async with self._session:
             return self
 
     async def __aexit__(self, *args) -> None:
-        return await self.session.__aexit__(*args)
+        return await self._session.__aexit__(*args)
 
 
 class AsyncHatClient(BaseHatClient):
