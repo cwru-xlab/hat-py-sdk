@@ -241,6 +241,9 @@ class AsyncHatClient(BaseHatClient):
             for r in require_record_id(record_ids)]
         return {"records": record_ids}
 
+    def to_sync(self) -> HatClient:
+        return HatClient(self)
+
     def __repr__(self) -> str:
         return utils.to_str(self, token=self.token, namespace=self._namespace)
 
@@ -248,9 +251,9 @@ class AsyncHatClient(BaseHatClient):
 class HatClient(BaseHatClient):
     __slots__ = "_wrapped"
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._wrapped = AsyncHatClient(*args, **kwargs)
+    def __init__(self, wrapped: AsyncHatClient):
+        super().__init__(wrapped.namespace)
+        self._wrapped = wrapped
 
     def get(
             self,
@@ -268,6 +271,9 @@ class HatClient(BaseHatClient):
 
     def delete(self, record_ids: StringLike | IStringLike) -> None:
         return sync.async_to_sync(self._wrapped)(record_ids)
+
+    def to_async(self) -> AsyncHatClient:
+        return self._wrapped
 
     def __repr__(self) -> str:
         return utils.to_str(
