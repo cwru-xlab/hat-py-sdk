@@ -24,10 +24,8 @@ MTypes = Iterable[Type[M]]
 NEVER_CACHE = 0
 SESSION_DEFAULTS = {
     "headers": {"Content-Type": mimetypes.types_map[".json"]},
-    "stream": True,
     "allowed_codes": [200] + list(errors.possible_codes),
     "allowed_methods": ["GET", "POST"],
-    "stale_if_error": True,
     "expire_after": datetime.timedelta(minutes=10),
     "urls_expire_after": {
         urls.domain_owner_token("*"): NEVER_CACHE,
