@@ -34,7 +34,8 @@ def ensure_iterable(method: Callable) -> Callable:
     return wrapper
 
 
-class BaseResponseHandler(abc.ABC):
+class BaseResponseHandler:
+    __slots__ = ()
 
     def on_success(self, response: Any, **kwargs) -> Any:
         return response

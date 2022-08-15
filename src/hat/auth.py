@@ -18,10 +18,9 @@ from . import errors, urls, utils
 from .client import AsyncHttpClient
 from .model import ApiConfig
 
-TOKEN_HEADER = "x-auth-token"
-
 JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
 TOKEN_KEY = "accessToken"
+TOKEN_HEADER = "x-auth-token"
 
 
 class JwtToken(BaseModel):
@@ -137,7 +136,7 @@ class BaseApiToken(abc.ABC):
 
 
 class AsyncApiToken(BaseApiToken, abc.ABC):
-    __slots__ = "client"
+    __slots__ = "_client"
 
     def __init__(
             self,

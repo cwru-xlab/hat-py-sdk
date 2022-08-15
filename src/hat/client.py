@@ -65,7 +65,6 @@ class AsyncResponseHandler(BaseResponseHandler):
         elif urls.is_token_endpoint(url):
             return utils.loads(await response.read())[_auth.TOKEN_KEY]
         elif response.method.lower() == "delete":
-            await response.read()
             return None
         elif urls.is_api_endpoint(url):
             return HatRecord.parse(await response.read(), kwargs["mtypes"])
@@ -114,9 +113,9 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable,
             **kwargs
     ) -> Any:
         auth = auth or self._auth
-        kwargs = self._prepare_request(auth, **kwargs)
+        params = self._prepare_request(auth, **kwargs)
         try:
-            response = await self._session.request(method, url, **kwargs)
+            response = await self._session.request(method, url, **params)
             auth.on_response(response)
             response.raise_for_status()
         except ClientResponseError as error:
@@ -147,7 +146,7 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable,
 
 
 class AsyncHatClient(BaseHatClient):
-    __slots__ = "client", "_auth", "_token"
+    __slots__ = "_client", "_auth", "_token"
 
     def __init__(
             self,
@@ -156,7 +155,7 @@ class AsyncHatClient(BaseHatClient):
             namespace: Optional[str] = None
     ) -> None:
         super().__init__(namespace)
-        self.client = client
+        self._client = client
         self._token = token
         self._auth = AsyncTokenAuth(token)
 
@@ -195,7 +194,7 @@ class AsyncHatClient(BaseHatClient):
         return await self._request(method, url, **kwargs)
 
     async def _request(self, method: str, url: str, **kwargs) -> list[M] | None:
-        return await self.client.request(method, url, self._auth, **kwargs)
+        return await self._client.request(method, url, self._auth, **kwargs)
 
     @staticmethod
     def _prepare_get(string: StringLike) -> str:
