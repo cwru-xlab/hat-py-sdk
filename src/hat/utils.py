@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, AnyStr, Callable, Type
-
-from requests import Response
+from typing import Any, AnyStr, Callable
 
 try:
     import orjson as json
@@ -24,9 +22,6 @@ except ImportError:
 finally:
     def loads(obj: AnyStr, **kwargs) -> dict[str, Any]:
         return json.loads(obj, **kwargs)
-
-OnSuccess = Callable[[Response], Any]
-OnError = Callable[[int, Any], Type[Exception]]
 
 
 def match_signature(obj: Callable, **kwargs) -> dict[str, Any]:
