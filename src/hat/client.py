@@ -11,7 +11,10 @@ from requests import HTTPError, Response, Session
 from requests_cache import CachedSession
 
 from . import errors, sessions, tokens, urls, utils
-from .base import BaseHttpClient, BaseResponseHandler, Cachable, HttpAuth
+from .auth import TokenAuth
+from .base import BaseHatClient, BaseHttpClient, BaseResponseHandler, \
+    Cachable, \
+    HttpAuth
 from .model import GetOpts, HatModel, HatRecord, M
 from .tokens import Token
 
@@ -159,6 +162,41 @@ class ResponseHandler(BaseResponseHandler):
 
     def content(self, error: HTTPError) -> Mapping[str, str]:
         return utils.loads(error.response.content)
+
+
+class HatClient2(BaseHatClient):
+    __slots__ = "client", "_token", "_auth"
+
+    def __init__(
+            self,
+            client: HttpClient,
+            token: Token,
+            namespace: Optional[str] = None,
+    ) -> None:
+        super(HatClient2, self).__init__(namespace)
+        self.client = client
+        self._token = token
+        self._auth = TokenAuth(token)
+
+    def get(
+            self,
+            endpoint: StringLike,
+            mtype: Type[M] = HatModel,
+            options: Optional[GetOpts] = None
+    ) -> list[M]:
+        if options:
+            options = options.json()
+        endpoint = self._prepare_get(endpoint)
+        return self._endpoint_request("GET", endpoint, data=options)
+
+    def _endpoint_request(
+            self, method: str, endpoint: str, **kwargs) -> list[M]:
+        url = urls.domain_endpoint(
+            self._token.domain, self._namespace, endpoint)
+        return self._request(method, url=url, **kwargs)
+
+    def _request(self, method: str, **kwargs) -> list[M]:
+        return self.client.request(method, auth=self._auth, **kwargs)
 
 
 class HatClient(utils.SessionMixin):

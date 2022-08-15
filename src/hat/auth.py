@@ -3,8 +3,7 @@ from typing import Mapping, Protocol
 
 from keyring.credentials import Credential
 
-from . import Token
-from .base import HttpAuth
+from base import HttpAuth
 
 TOKEN_HEADER = "x-auth-token"
 
@@ -13,10 +12,10 @@ class SupportsHeaders(Protocol):
     headers: Mapping[str, str]
 
 
-class TokenHttpAuth(HttpAuth):
+class TokenAuth(HttpAuth):
     __slots__ = "_token"
 
-    def __init__(self, token: Token):
+    def __init__(self, token):  # TODO Add type hint
         self._token = token
 
     @property
@@ -28,7 +27,17 @@ class TokenHttpAuth(HttpAuth):
             self._token.value = response.headers[TOKEN_HEADER]
 
 
-class CredentialHttpAuth(HttpAuth):
+class AsyncTokenAuth(TokenAuth):
+
+    def __init__(self, token):  # TODO Add type hint
+        super().__init__(token)
+
+    @property
+    async def headers(self) -> Mapping[str, str]:
+        return {TOKEN_HEADER: await self._token.value}
+
+
+class CredentialAuth(HttpAuth):
     __slots__ = "_credential",
 
     def __init__(self, credential: Credential):
