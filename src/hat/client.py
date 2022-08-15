@@ -1,43 +1,37 @@
 from __future__ import annotations
 
+import asyncio
+import datetime
 import functools
 import itertools
-import re
-from contextlib import AbstractContextManager
-from typing import (Any, Callable, Collection, Generator, Iterable, Iterator,
-                    Mapping, Optional, Type, Union)
+import mimetypes
+import pprint
+from contextlib import AbstractAsyncContextManager
+from typing import Any, Generator, Iterable, Iterator, Optional, Type
 
-from requests import HTTPError, Response, Session
-from requests_cache import CachedSession
+from aiohttp import ClientResponse, ClientResponseError, ClientSession
+from aiohttp_client_cache import CacheBackend, CachedSession
+from asgiref import sync
 
-from . import errors, sessions, tokens, urls, utils
+from . import Token, errors, tokens, urls, utils
 from .auth import TokenAuth
-from .base import BaseHatClient, BaseHttpClient, BaseResponseHandler, \
-    Cachable, \
-    HttpAuth
+from .base import AsyncCachable, BaseHatClient, BaseHttpClient, \
+    BaseResponseHandler, HttpAuth, IStringLike, Models, StringLike
 from .model import GetOpts, HatModel, HatRecord, M
-from .tokens import Token
 
-StringLike = Union[str, HatModel]
-IStringLike = Iterable[StringLike]
 MTypes = Iterable[Type[M]]
-Models = Union[M, Iterator[M], Collection[M]]
 
-
-def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
-    by_endpoint = functools.partial(lambda r: r.endpoint)
-    groups = itertools.groupby(sorted(models, key=by_endpoint), by_endpoint)
-    return ((endpoint, list(models)) for endpoint, models in groups)
-
-
-def get_models(
-        res: Response, on_error: utils.OnError, mtypes: MTypes) -> list[M]:
-    return utils.handle(
-        res, lambda r: HatRecord.parse(r.content, mtypes), on_error)
-
-
-def types(models: Iterable[M]) -> MTypes:
-    return (type(m) for m in models)
+NEVER_CACHE = 0
+SESSION_DEFAULTS = {
+    "headers": {"Content-Type": mimetypes.types_map[".json"]},
+    "stream": True,
+    "allowed_codes": [200] + list(errors.possible_codes),
+    "allowed_methods": ["GET", "POST"],
+    "stale_if_error": True,
+    "expire_after": datetime.timedelta(minutes=10),
+    "urls_expire_after": {
+        urls.domain_owner_token("*"): NEVER_CACHE,
+        urls.domain_app_token("*", "*"): NEVER_CACHE}}
 
 
 def require_endpoint(strings: IStringLike) -> Iterator[StringLike]:
@@ -54,50 +48,67 @@ def require_record_id(strings: IStringLike) -> Iterator[StringLike]:
         yield s
 
 
-def requires_namespace(method: Callable) -> Callable:
-    @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        if self.namespace is None:
-            raise ValueError("'namespace' is required to access endpoint data")
-        return method(self, *args, **kwargs)
-
-    return wrapper
+def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
+    by_endpoint = functools.partial(lambda r: r.endpoint)
+    groups = itertools.groupby(sorted(models, key=by_endpoint), by_endpoint)
+    return ((endpoint, list(models)) for endpoint, models in groups)
 
 
-def ensure_iterable(method: Callable) -> Callable:
-    @functools.wraps(method)
-    def wrapper(self, iterable, *args, **kwargs):
-        # pydantic.BaseModel is an Iterable, so we need to check subclasses.
-        if not isinstance(iterable, (Iterator, Collection)):
-            iterable = [iterable]
-        return method(self, iterable, *args, **kwargs)
-
-    return wrapper
+def types(models: Iterable[M]) -> MTypes:
+    return (type(m) for m in models)
 
 
-class HttpClient(BaseHttpClient, Cachable, AbstractContextManager):
+class AsyncResponseHandler(BaseResponseHandler):
+
+    async def on_success(
+            self, response: ClientResponse, **kwargs) -> str | list[M] | None:
+        if urls.is_pk_endpoint(url := str(response.url)):
+            return await response.text()
+        elif urls.is_token_endpoint(url):
+            return utils.loads(await response.read())[tokens.TOKEN_KEY]
+        elif response.method.lower() == "delete":
+            await response.read()
+            return None
+        elif urls.is_api_endpoint(url):
+            return HatRecord.parse(await response.read(), kwargs["mtypes"])
+        else:
+            headers = pprint.pformat(response.headers, indent=2)
+            raise ValueError(
+                f"Unable to process response for URL {url}\n{headers}")
+
+    async def on_error(self, error: ClientResponseError, **kwargs) -> None:
+        status, content = error.status, utils.loads(error.message)
+        if urls.is_auth_endpoint(url := str(error.request_info.url)):
+            raise errors.find_error("auth", status, content)
+        elif urls.is_api_endpoint(url):
+            method = error.request_info.method.lower()
+            raise errors.find_error(method, status, content)
+        else:
+            raise error
+
+
+class AsyncHttpClient(BaseHttpClient, AsyncCachable,
+                      AbstractAsyncContextManager):
     __slots__ = "session", "handler", "auth"
 
     def __init__(
             self,
-            session: Optional[Session] = None,
-            handler: Optional[ResponseHandler] = None,
+            session: Optional[ClientSession] = None,
+            handler: Optional[AsyncResponseHandler] = None,
             auth: Optional[HttpAuth] = None,
             **kwargs
     ) -> None:
         super().__init__()
         self.session = session or self._new_session(**kwargs)
-        self.handler = handler or ResponseHandler()
+        self.handler = handler or AsyncResponseHandler()
         self.auth = auth or HttpAuth()
 
     @staticmethod
-    def _new_session(**kwargs) -> Session:
-        session = CachedSession(**sessions.DEFAULTS | kwargs)
-        session.headers = sessions.DEFAULTS["headers"]
-        session.stream = sessions.DEFAULTS["stream"]
-        return session
+    def _new_session(**kwargs) -> ClientSession:
+        kwargs = SESSION_DEFAULTS | kwargs
+        return CachedSession(cache=CacheBackend(**kwargs), **kwargs)
 
-    def request(
+    async def request(
             self,
             method: str,
             url: str,
@@ -106,167 +117,85 @@ class HttpClient(BaseHttpClient, Cachable, AbstractContextManager):
     ) -> Any:
         auth = auth or self.auth
         kwargs = self._prepare_request(auth, **kwargs)
-        response = self.session.request(method, url, **kwargs)
         try:
-            response.raise_for_status()
-        except HTTPError as error:
-            result = self.handler.on_error(error, **kwargs)
-        else:
-            result = self.handler.on_success(response, **kwargs)
-        finally:
+            response = await self.session.request(method, url, **kwargs)
             auth.on_response(response)
+            response.raise_for_status()
+        except ClientResponseError as error:
+            result = await self.handler.on_error(error, **kwargs)
+        else:
+            result = await self.handler.on_success(response, **kwargs)
             response.close()
         return result
 
-    def _prepare_request(self, auth: HttpAuth, kwargs: Any) -> dict[str, Any]:
+    def _prepare_request(self, auth: HttpAuth, **kwargs: Any) -> dict[str, Any]:
         kwargs.update({"headers": auth.headers})
+        kwargs["raise_for_status"] = False
         return utils.match_signature(self.session.request, **kwargs)
 
-    def close(self) -> None:
-        self.session.close()
+    async def close(self) -> None:
+        return await self.session.close()
 
-    def clear_cache(self) -> None:
+    async def clear_cache(self) -> None:
         if isinstance(self.session, CachedSession):
-            return self.session.cache.clear()
+            return await self.session.cache.clear()
 
-    def __enter__(self) -> HttpClient:
-        with self.session:
+    async def __aenter__(self) -> AsyncHttpClient:
+        async with self.session:
             return self
 
-    def __exit__(self, *args) -> None:
-        return self.session.__exit__(*args)
+    async def __aexit__(self, *args) -> None:
+        return await self.session.__aexit__(*args)
 
 
-class ResponseHandler(BaseResponseHandler):
-
-    def on_success(self, response: Response, **kwargs) -> str | list[M] | None:
-        if urls.is_pk_endpoint(url := response.url):
-            return response.text
-        elif urls.is_token_endpoint(url):
-            return utils.loads(response.content)[tokens.TOKEN_KEY]
-        elif response.request.method.lower() == "delete":
-            return None
-        elif urls.is_api_endpoint(url):
-            return HatRecord.parse(response.content, kwargs["mtypes"])
-        else:
-            return super().on_success(response)
-
-    def status(self, error: HTTPError) -> int:
-        return error.response.status_code
-
-    def url(self, error: HTTPError) -> str:
-        return error.response.url
-
-    def method(self, error: HTTPError) -> str:
-        return error.request.method.lower()
-
-    def content(self, error: HTTPError) -> Mapping[str, str]:
-        return utils.loads(error.response.content)
-
-
-class HatClient2(BaseHatClient):
-    __slots__ = "client", "_token", "_auth"
+class AsyncHatClient(BaseHatClient):
+    __slots__ = "client", "_auth", "_token"
 
     def __init__(
             self,
-            client: HttpClient,
+            client: AsyncHttpClient,
             token: Token,
-            namespace: Optional[str] = None,
+            namespace: Optional[str] = None
     ) -> None:
-        super(HatClient2, self).__init__(namespace)
+        super().__init__(namespace)
         self.client = client
-        self._token = token
-        self._auth = TokenAuth(token)
+        self.token = token
 
-    def get(
+    async def get(
             self,
             endpoint: StringLike,
             mtype: Type[M] = HatModel,
             options: Optional[GetOpts] = None
     ) -> list[M]:
-        if options:
-            options = options.json()
         endpoint = self._prepare_get(endpoint)
-        return self._endpoint_request("GET", endpoint, data=options)
+        return await self._endpoint_request(
+            "GET", endpoint, data=options, mtypes=[mtype])
 
-    def _endpoint_request(
-            self, method: str, endpoint: str, **kwargs) -> list[M]:
-        url = urls.domain_endpoint(
-            self._token.domain, self._namespace, endpoint)
-        return self._request(method, url=url, **kwargs)
+    async def post(self, models: Models) -> list[M]:
+        posted = await asyncio.gather(*(
+            self._endpoint_request("POST", endpoint, data=models, mtypes=mtypes)
+            for endpoint, models, mtypes in self._prepare_post(models)))
+        return list(itertools.chain(posted))
 
-    def _request(self, method: str, **kwargs) -> list[M]:
-        return self.client.request(method, auth=self._auth, **kwargs)
-
-
-class HatClient(utils.SessionMixin):
-    __slots__ = "_token", "_auth", "_namespace", "_pattern"
-
-    def __init__(
-            self,
-            token: Token,
-            namespace: Optional[str] = None,
-            share_session: bool = True,
-            **kwargs):
-        super().__init__(token._session if share_session else None, **kwargs)
-        self._token = token
-        self._auth = tokens.TokenAuth(token)
-        self._namespace = namespace
-        self._pattern = re.compile(rf"^{namespace}/")
-
-    @property
-    def namespace(self) -> Optional[str]:
-        return self._namespace
-
-    @property
-    def token(self) -> Token:
-        return self._token
-
-    @requires_namespace
-    def get(
-            self,
-            endpoint: StringLike,
-            mtype: Type[M] = HatModel,
-            options: Optional[GetOpts] = None
-    ) -> list[M]:
-        if options:
-            options = options.json()
-        endpoint = self._prepare_get(endpoint)
-        res = self._endpoint_request("GET", endpoint, data=options)
-        return get_models(res, errors.get_error, [mtype])
-
-    @ensure_iterable
-    @requires_namespace
-    def post(self, models: Models) -> list[M]:
-        posted = []
-        for endpoint, models, mtypes in self._prepare_post(models):
-            res = self._endpoint_request("POST", endpoint, data=models)
-            posted.extend(get_models(res, errors.post_error, mtypes))
-        return posted
-
-    @ensure_iterable
-    def put(self, models: Models) -> list[M]:
+    async def put(self, models: Models) -> list[M]:
         put = self._prepare_put(models)
-        res = self._data_request("PUT", data=put)
-        return get_models(res, errors.put_error, types(models))
+        return await self._data_request("PUT", data=put, mytpes=types(models))
 
-    @ensure_iterable
-    def delete(self, record_ids: StringLike | IStringLike) -> None:
+    async def delete(self, record_ids: StringLike | IStringLike) -> None:
         delete = self._prepare_delete(record_ids)
-        res = self._data_request("DELETE", params=delete)
-        utils.get_json(res, errors.delete_error)
+        return await self._data_request("DELETE", params=delete)
 
-    def _endpoint_request(
-            self, method: str, endpoint: str, **kwargs) -> Response:
+    async def _endpoint_request(
+            self, method: str, endpoint: str, **kwargs) -> list[M]:
         url = urls.domain_endpoint(self.token.domain, self.namespace, endpoint)
-        return self._request(method, url=url, **kwargs)
+        return await self._request(method, url, **kwargs)
 
-    def _data_request(self, method: str, **kwargs) -> Response:
+    async def _data_request(self, method: str, **kwargs) -> list[M] | None:
         url = urls.domain_data(self.token.domain)
-        return self._request(method, url=url, **kwargs)
+        return await self._request(method, url, **kwargs)
 
-    def _request(self, method: str, **kwargs) -> Response:
-        return self._session.request(method, auth=self._auth, **kwargs)
+    async def _request(self, method: str, url: str, **kwargs) -> list[M] | None:
+        return await self.client.request(method, url, self._auth, **kwargs)
 
     @staticmethod
     def _prepare_get(string: StringLike) -> str:
@@ -292,9 +221,18 @@ class HatClient(utils.SessionMixin):
             # from responses will include the namespace. This is just a
             # convenience if wanting to create HatRecords manually.
             if self._pattern.match(m.endpoint) is None:
-                m.endpoint = f"{self.namespace}/{m.endpoint}"
+                m.endpoint = f"{self._namespace}/{m.endpoint}"
             formatted.append(m)
         return HatRecord.to_json(formatted)
+
+    @property
+    def token(self) -> Token:
+        return self._token
+
+    @token.setter
+    def token(self, value: Token) -> None:
+        self._token = value
+        self._auth = TokenAuth(value)
 
     @staticmethod
     def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:
@@ -304,4 +242,33 @@ class HatClient(utils.SessionMixin):
         return {"records": record_ids}
 
     def __repr__(self) -> str:
-        return utils.to_str(self, token=self._token, namespace=self._namespace)
+        return utils.to_str(self, token=self.token, namespace=self._namespace)
+
+
+class HatClient(BaseHatClient):
+    __slots__ = "_wrapped"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._wrapped = AsyncHatClient(*args, **kwargs)
+
+    def get(
+            self,
+            endpoint: StringLike,
+            mtype: Type[M] = HatModel,
+            options: Optional[GetOpts] = None
+    ) -> list[M]:
+        return sync.async_to_sync(self._wrapped)(endpoint, mtype, options)
+
+    def post(self, models: Models) -> list[M]:
+        return sync.async_to_sync(self._wrapped)(models)
+
+    def put(self, models: Models) -> list[M]:
+        return sync.async_to_sync(self._wrapped)(models)
+
+    def delete(self, record_ids: StringLike | IStringLike) -> None:
+        return sync.async_to_sync(self._wrapped)(record_ids)
+
+    def __repr__(self) -> str:
+        return utils.to_str(
+            self, token=self._wrapped.token, namespace=self._namespace)

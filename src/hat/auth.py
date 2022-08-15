@@ -1,5 +1,5 @@
 import mimetypes
-from typing import Mapping, Protocol
+from typing import Protocol
 
 from keyring.credentials import Credential
 
@@ -9,7 +9,7 @@ TOKEN_HEADER = "x-auth-token"
 
 
 class SupportsHeaders(Protocol):
-    headers: Mapping[str, str]
+    headers: dict[str, str]
 
 
 class TokenAuth(HttpAuth):
@@ -19,7 +19,7 @@ class TokenAuth(HttpAuth):
         self._token = token
 
     @property
-    def headers(self) -> Mapping[str, str]:
+    def headers(self) -> dict[str, str]:
         return {TOKEN_HEADER: self._token.value}
 
     def on_response(self, response: SupportsHeaders) -> None:
@@ -33,7 +33,7 @@ class AsyncTokenAuth(TokenAuth):
         super().__init__(token)
 
     @property
-    async def headers(self) -> Mapping[str, str]:
+    async def headers(self) -> dict[str, str]:
         return {TOKEN_HEADER: await self._token.value}
 
 
@@ -44,7 +44,7 @@ class CredentialAuth(HttpAuth):
         self._credential = credential
 
     @property
-    def headers(self) -> Mapping[str, str]:
+    def headers(self) -> dict[str, str]:
         return {
             "Accept": mimetypes.types_map[".json"],
             "username": self._credential.username,
