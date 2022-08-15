@@ -19,6 +19,7 @@ class HatConfig(BaseConfig):
     use_enum_values = True
     json_dumps = utils.dumps
     json_loads = utils.loads
+    underscore_attrs_are_private = True
 
 
 class ApiConfig(HatConfig):
