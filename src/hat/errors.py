@@ -143,7 +143,8 @@ errors: dict[str, ErrorMapping] = {
 
 
 def find_error(kind: str, status: int, content: Any) -> Type[HatError]:
-    if (key := kind.lower().strip()) in errors:
+    key = kind.lower().strip()
+    if key in errors:
         return errors[key].get(status, content)
     else:
         raise ValueError(

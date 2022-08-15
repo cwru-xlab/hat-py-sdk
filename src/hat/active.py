@@ -15,7 +15,8 @@ class AsyncActiveHatModel(HatModel):
     async def save(self, endpoint: Optional[str] = None) -> A:
         if endpoint is not None:
             self.endpoint = endpoint
-        if has_id := self.record_id is not None:
+        has_id = self.record_id is not None
+        if has_id:
             method = self._client().put
         else:
             method = self._client().post

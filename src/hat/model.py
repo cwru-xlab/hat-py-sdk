@@ -60,11 +60,16 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
 
     @classmethod
     def parse(cls, records: AnyStr, mtypes: Iterable[Type[M]]) -> list[M]:
-        if not isinstance(records := cls.__config__.json_loads(records), list):
+        records = cls.__config__.json_loads(records)
+        if not isinstance(records, list):
             records = [records]
         # When more records exist than model types, try binding to the last one.
         mtypes, m = iter(mtypes), None
-        return [cls._to_model(r, m := next(mtypes, m)) for r in records]
+        models = []
+        for rec in records:
+            models.append(cls._to_model(rec, m))
+            m = next(mtypes, m)
+        return models
 
     @classmethod
     def _to_model(cls, record: dict[str, Any], mtype: Type[M]) -> M:

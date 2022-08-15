@@ -60,7 +60,8 @@ class AsyncResponseHandler(BaseResponseHandler):
 
     async def on_success(
             self, response: ClientResponse, **kwargs) -> str | list[M] | None:
-        if urls.is_pk_endpoint(url := str(response.url)):
+        url = str(response.url)
+        if urls.is_pk_endpoint(url):
             return await response.text()
         elif urls.is_token_endpoint(url):
             return utils.loads(await response.read())[_auth.TOKEN_KEY]
@@ -74,14 +75,26 @@ class AsyncResponseHandler(BaseResponseHandler):
                 f"Unable to process response for URL {url}\n{headers}")
 
     async def on_error(self, error: ClientResponseError, **kwargs) -> None:
-        status, content = error.status, utils.loads(error.message)
-        if urls.is_auth_endpoint(url := str(error.request_info.url)):
+        url = str(error.request_info.url)
+        if urls.is_auth_endpoint(url):
+            status = self._status(error)
+            content = self._content(error)
             raise errors.find_error("auth", status, content)
         elif urls.is_api_endpoint(url):
             method = error.request_info.method.lower()
+            status = self._status(error)
+            content = self._content(error)
             raise errors.find_error(method, status, content)
         else:
             raise error
+
+    @staticmethod
+    def _status(error: ClientResponseError) -> int:
+        return error.status
+
+    @staticmethod
+    def _content(error: ClientResponseError) -> dict[str, Any]:
+        return utils.loads(error.message)
 
 
 class AsyncHttpClient(BaseHttpClient, AsyncCachable,
