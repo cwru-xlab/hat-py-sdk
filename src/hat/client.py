@@ -165,6 +165,8 @@ class AsyncHatClient(BaseHatClient):
             mtype: Type[M] = HatModel,
             options: Optional[GetOpts] = None
     ) -> list[M]:
+        if options:
+            options = options.json()
         endpoint = self._prepare_get(endpoint)
         return await self._endpoint_request(
             "GET", endpoint, data=options, mtypes=[mtype])
