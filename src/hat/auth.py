@@ -9,7 +9,6 @@ from typing import Any
 
 import jwt
 from aiohttp import ClientResponse
-from asgiref import sync
 from keyring.credentials import Credential
 from pydantic import BaseModel
 from pydantic import PositiveInt
@@ -79,8 +78,9 @@ class JwtAppToken(JwtToken):
         return JwtAppToken(**super().decode(encoded, **kwargs))
 
 
-class BaseApiToken(abc.ABC):
+class ApiToken(abc.ABC):
     __slots__ = (
+        "_client",
         "_auth",
         "_jwt_type",
         "_value",
@@ -91,7 +91,10 @@ class BaseApiToken(abc.ABC):
         "_expires",
     )
 
-    def __init__(self, auth: HttpAuth, jwt_type: type[JwtToken]) -> None:
+    def __init__(
+        self, client: HttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
+    ) -> None:
+        self._client = client
         self._auth = auth
         self._jwt_type = jwt_type
         self._value: str | None = None
@@ -101,54 +104,6 @@ class BaseApiToken(abc.ABC):
         self._domain: str | None = None
         self._expires = datetime.datetime.max
 
-    @abc.abstractmethod
-    def pk(self) -> str:
-        pass
-
-    @abc.abstractmethod
-    def value(self) -> str:
-        pass
-
-    @abc.abstractmethod
-    def set_value(self, value: str) -> None:
-        pass
-
-    @abc.abstractmethod
-    def domain(self) -> str:
-        pass
-
-    @abc.abstractmethod
-    def url(self) -> str:
-        pass
-
-    @abc.abstractmethod
-    def decode(self, *, verify: bool = True) -> JwtToken:
-        pass
-
-    @property
-    def expired(self) -> bool:
-        return self._expires <= datetime.datetime.utcnow()
-
-    def _compute_expiration(self) -> datetime.datetime:
-        iat = datetime.datetime.utcfromtimestamp(float(self._decoded.iat))
-        exp = datetime.datetime.utcfromtimestamp(float(self._decoded.exp))
-        return min(iat + self._ttl, exp)
-
-    def __repr__(self) -> str:
-        return utils.to_str(
-            self, domain=self._domain, expired=self.expired, expires=self._expires
-        )
-
-
-class AsyncApiToken(BaseApiToken, abc.ABC):
-    __slots__ = "_client"
-
-    def __init__(
-        self, client: HttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
-    ) -> None:
-        super().__init__(auth, jwt_type)
-        self._client = client
-
     async def pk(self) -> str:
         if self._pk is None:
             url = urls.domain_public_key(await self.domain())
@@ -157,7 +112,7 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
 
     async def value(self) -> str:
         if self._value is None or self.expired:
-            token = await self._client.request("GET", self.url(), self._auth)
+            token = await self._client.request("GET", await self.url(), self._auth)
             await self.set_value(token)
         return self._value
 
@@ -180,8 +135,26 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
             value, pk = await self.value(), None
         return self._jwt_type.decode(value, pk=pk, verify=verify)
 
+    @abc.abstractmethod
+    async def url(self) -> str:
+        pass
 
-class AsyncCredentialOwnerToken(AsyncApiToken):
+    @property
+    def expired(self) -> bool:
+        return self._expires <= datetime.datetime.utcnow()
+
+    def _compute_expiration(self) -> datetime.datetime:
+        iat = datetime.datetime.utcfromtimestamp(float(self._decoded.iat))
+        exp = datetime.datetime.utcfromtimestamp(float(self._decoded.exp))
+        return min(iat + self._ttl, exp)
+
+    def __repr__(self) -> str:
+        return utils.to_str(
+            self, domain=self._domain, expired=self.expired, expires=self._expires
+        )
+
+
+class CredentialOwnerToken(ApiToken):
     __slots__ = "_url"
 
     def __init__(self, client: HttpClient, credential: Credential) -> None:
@@ -192,16 +165,16 @@ class AsyncCredentialOwnerToken(AsyncApiToken):
         return self._url
 
 
-class AsyncAppToken(AsyncApiToken):
+class AppToken(ApiToken):
     __slots__ = "_owner_token", "_app_id", "_url"
 
     def __init__(
         self,
         client: HttpClient,
-        owner_token: AsyncCredentialOwnerToken,
+        owner_token: CredentialOwnerToken,
         app_id: str,
     ) -> None:
-        super().__init__(client, AsyncTokenAuth(owner_token), JwtAppToken)
+        super().__init__(client, TokenAuth(owner_token), JwtAppToken)
         self._owner_token = owner_token
         self._app_id = app_id
         self._url: str | None = None
@@ -216,41 +189,7 @@ class AsyncAppToken(AsyncApiToken):
         return self._url
 
 
-class ApiToken(BaseApiToken):
-    __slots__ = "_wrapped"
-
-    def __init__(self, wrapped: AsyncApiToken) -> None:
-        super().__init__(wrapped._auth, wrapped._jwt_type)
-        self._wrapped = wrapped
-
-    def pk(self) -> str:
-        return sync.async_to_sync(self._wrapped.pk)()
-
-    def value(self) -> str:
-        return sync.async_to_sync(self._wrapped.value)()
-
-    def set_value(self, value: str) -> None:
-        return sync.async_to_sync(self._wrapped.set_value)(value)
-
-    def domain(self) -> str:
-        return sync.async_to_sync(self._wrapped.domain)()
-
-    def url(self) -> str:
-        return sync.async_to_sync(self._wrapped.url)()
-
-    def decode(self, *, verify: bool = True) -> JwtToken:
-        return sync.async_to_sync(self._wrapped.decode)(verify=verify)
-
-
-CredentialOwnerToken = ApiToken
-AppToken = ApiToken
-
-
-class AsyncWebOwnerToken(AsyncApiToken, abc.ABC):  # TODO
-    pass
-
-
-class WebOwnerToken(BaseApiToken, abc.ABC):  # TODO
+class WebOwnerToken(ApiToken, abc.ABC):  # TODO
     pass
 
 
@@ -264,16 +203,16 @@ class HttpAuth:
         pass
 
 
-class AsyncTokenAuth(HttpAuth):
+class TokenAuth(HttpAuth):
     __slots__ = "_token"
 
-    def __init__(self, token: AsyncApiToken):
+    def __init__(self, token: ApiToken):
         self._token = token
 
     async def headers(self) -> dict[str, str]:
         return {TOKEN_HEADER: await self._token.value()}
 
-    async def on_response(self, response: "ClientResponse") -> None:
+    async def on_response(self, response: ClientResponse) -> None:
         if TOKEN_HEADER in response.headers:
             await self._token.set_value(response.headers[TOKEN_HEADER])
 

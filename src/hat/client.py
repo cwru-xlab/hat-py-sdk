@@ -18,8 +18,8 @@ from asgiref import sync
 
 from . import urls
 from . import utils
-from .auth import AsyncApiToken
-from .auth import AsyncTokenAuth
+from .auth import ApiToken
+from .auth import TokenAuth
 from .http import HttpClient
 from .model import GetOpts
 from .model import HatModel
@@ -112,13 +112,13 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     def __init__(
         self,
         client: HttpClient,
-        token: AsyncApiToken,
+        token: ApiToken,
         namespace: str | None = None,
     ) -> None:
         super().__init__(namespace)
         self._client = client
         self._token = token
-        self._auth = AsyncTokenAuth(token)
+        self._auth = TokenAuth(token)
 
     @requires_namespace
     async def get(
@@ -205,7 +205,7 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
         return {"records": record_ids}
 
     @property
-    def token(self) -> AsyncApiToken:
+    def token(self) -> ApiToken:
         return self._token
 
     def to_sync(self) -> HatClient:

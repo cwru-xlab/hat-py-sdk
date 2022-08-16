@@ -3,16 +3,12 @@ from .active import ActiveHatModel
 from .active import AsyncActiveHatModel
 from .auth import ApiToken
 from .auth import AppToken
-from .auth import AsyncApiToken
-from .auth import AsyncAppToken
-from .auth import AsyncCredentialOwnerToken
-from .auth import AsyncTokenAuth
-from .auth import AsyncWebOwnerToken
 from .auth import CredentialAuth
 from .auth import CredentialOwnerToken
 from .auth import JwtAppToken
 from .auth import JwtOwnerToken
 from .auth import JwtToken
+from .auth import TokenAuth
 from .auth import WebOwnerToken
 from .client import AsyncHatClient
 from .client import HatClient
