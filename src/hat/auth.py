@@ -5,18 +5,20 @@ import asyncio
 import datetime
 import mimetypes
 import re
-from typing import Optional, TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
+
 
 if TYPE_CHECKING:
     from aiohttp import ClientResponse
-    from .client import AsyncHttpClient
+    from .http import AsyncHttpClient
     from keyring.credentials import Credential
 
-from asgiref import sync
-
 import jwt
-
-from pydantic import BaseModel, constr, PositiveInt, StrictStr
+from asgiref import sync
+from pydantic import BaseModel
+from pydantic import PositiveInt
+from pydantic import StrictStr
+from pydantic import constr
 
 from . import errors
 from . import urls
@@ -42,7 +44,7 @@ class JwtToken(BaseModel):
         cls,
         encoded: str,
         *,
-        pk: Optional[str] = None,
+        pk: str | None = None,
         verify: bool = False,
         as_token: bool = False,
     ) -> dict | JwtToken:
@@ -93,14 +95,14 @@ class BaseApiToken(abc.ABC):
         "_expires",
     )
 
-    def __init__(self, auth: HttpAuth, jwt_type: Type[JwtToken]) -> None:
+    def __init__(self, auth: HttpAuth, jwt_type: type[JwtToken]) -> None:
         self._auth = auth
         self._jwt_type = jwt_type
-        self._value: Optional[str] = None
-        self._decoded: Optional[JwtToken] = None
-        self._pk: Optional[str] = None
+        self._value: str | None = None
+        self._decoded: JwtToken | None = None
+        self._pk: str | None = None
         self._ttl = datetime.timedelta(days=3)
-        self._domain: Optional[str] = None
+        self._domain: str | None = None
         self._expires = datetime.datetime.max
 
     @abc.abstractmethod
@@ -146,7 +148,7 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
     __slots__ = "_client"
 
     def __init__(
-        self, client: "AsyncHttpClient", auth: HttpAuth, jwt_type: Type[JwtToken]
+        self, client: AsyncHttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
     ) -> None:
         super().__init__(auth, jwt_type)
         self._client = client
@@ -186,7 +188,7 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
 class AsyncCredentialOwnerToken(AsyncApiToken):
     __slots__ = "_url"
 
-    def __init__(self, client: "AsyncHttpClient", credential: "Credential") -> None:
+    def __init__(self, client: AsyncHttpClient, credential: Credential) -> None:
         super().__init__(client, CredentialAuth(credential), JwtOwnerToken)
         self._url = urls.username_owner_token(credential.username)
 
@@ -199,14 +201,14 @@ class AsyncAppToken(AsyncApiToken):
 
     def __init__(
         self,
-        client: "AsyncHttpClient",
+        client: AsyncHttpClient,
         owner_token: AsyncCredentialOwnerToken,
         app_id: str,
     ) -> None:
         super().__init__(client, AsyncTokenAuth(owner_token), JwtAppToken)
         self._owner_token = owner_token
         self._app_id = app_id
-        self._url: Optional[str] = None
+        self._url: str | None = None
 
     async def domain(self) -> str:
         # Must defer to owner token to avoid infinite recursion.
@@ -273,10 +275,10 @@ class AsyncTokenAuth(HttpAuth):
 class CredentialAuth(HttpAuth):
     __slots__ = ("_credential",)
 
-    def __init__(self, credential: "Credential"):
+    def __init__(self, credential: Credential):
         self._credential = credential
 
-    def headers(self) -> dict[str, str]:
+    async def headers(self) -> dict[str, str]:
         return {
             "Accept": mimetypes.types_map[".json"],
             "username": self._credential.username,

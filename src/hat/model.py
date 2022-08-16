@@ -6,8 +6,6 @@ from typing import Any
 from typing import AnyStr
 from typing import Generic
 from typing import Iterable
-from typing import Optional
-from typing import Type
 from typing import TypeVar
 
 import pydantic
@@ -15,11 +13,11 @@ import ulid
 from humps import camel
 from pydantic import BaseConfig
 from pydantic import BaseModel
-from pydantic import conint
-from pydantic import constr
 from pydantic import Field
 from pydantic import NonNegativeInt
 from pydantic import StrictStr
+from pydantic import conint
+from pydantic import constr
 from pydantic.generics import GenericModel
 
 from . import utils
@@ -39,8 +37,8 @@ class ApiConfig(HatConfig):
 
 
 class BaseHatModel(BaseModel, ABC):
-    endpoint: Optional[StrictStr]
-    record_id: Optional[StrictStr]
+    endpoint: StrictStr | None
+    record_id: StrictStr | None
 
     Config = HatConfig
 
@@ -51,7 +49,7 @@ class BaseApiModel(BaseModel, ABC):
     def dict(self, by_alias: bool = True, **kwargs) -> dict[str, Any]:
         return super().dict(by_alias=by_alias, **kwargs)
 
-    def json(self, by_alias: bool = True, **kwargs) -> Optional[str]:
+    def json(self, by_alias: bool = True, **kwargs) -> str | None:
         return super().json(by_alias=by_alias, **kwargs)
 
 
@@ -70,7 +68,7 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
     data: dict[str, Any] = {}
 
     @classmethod
-    def parse(cls, records: AnyStr, mtypes: Iterable[Type[M]]) -> list[M]:
+    def parse(cls, records: AnyStr, mtypes: Iterable[type[M]]) -> list[M]:
         records = cls.__config__.json_loads(records)
         if not isinstance(records, list):
             records = [records]
@@ -78,12 +76,12 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
         mtypes, m = iter(mtypes), None
         models = []
         for rec in records:
-            models.append(cls._to_model(rec, m))
             m = next(mtypes, m)
+            models.append(cls._to_model(rec, m))
         return models
 
     @classmethod
-    def _to_model(cls, record: dict[str, Any], mtype: Type[M]) -> M:
+    def _to_model(cls, record: dict[str, Any], mtype: type[M]) -> M:
         if isinstance(record["data"], (bytes, str)):
             record["data"] = cls.__config__.json_loads(record["data"])
         record = cls(**record)
@@ -117,13 +115,13 @@ class Ordering(str, Enum):
 
 
 class GetOpts(BaseApiModel):
-    order_by: Optional[constr(min_length=1)]
-    ordering: Optional[Ordering]
-    skip: Optional[NonNegativeInt]
-    take: Optional[conint(ge=0, le=1000)]
+    order_by: constr(min_length=1) | None
+    ordering: Ordering | None
+    skip: NonNegativeInt | None
+    take: conint(ge=0, le=1000) | None
 
     def dict(self, exclude_none: bool = True, **kwargs) -> dict:
         return super().dict(exclude_none=exclude_none, **kwargs)
 
-    def json(self, exclude_none: bool = True, **kwargs) -> Optional[str]:
+    def json(self, exclude_none: bool = True, **kwargs) -> str | None:
         return super().json(exclude_none=exclude_none, **kwargs)

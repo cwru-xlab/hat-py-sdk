@@ -75,23 +75,23 @@ V = tuple[Optional[Type[E]], Optional[Resolver]]
 class ErrorMapping(Generic[E]):
     __slots__ = "_default", "_errors"
 
-    def __init__(self, default: Type[E]):
+    def __init__(self, default: type[E]):
         self._default = default
         self._errors = self._new_map(default)
 
     @staticmethod
-    def _new_map(default: Type[E]) -> dict[int, V]:
+    def _new_map(default: type[E]) -> dict[int, V]:
         return collections.defaultdict(lambda: (default, None))
 
-    def get(self, status: int, content: Any) -> Type[E]:
+    def get(self, status: int, content: Any) -> type[E]:
         error, resolver = self._errors[status]
         return error if resolver is None else resolver(content)
 
     def put(
         self,
         status: int,
-        error: Optional[Type[E]] = None,
-        resolver: Optional[Resolver] = None,
+        error: type[E] | None = None,
+        resolver: Resolver | None = None,
     ) -> None:
         if not (error is None) ^ (resolver is None):
             raise ValueError("Either 'error' or 'resolver' must be specified")
@@ -101,11 +101,11 @@ class ErrorMapping(Generic[E]):
         self._errors.update(mapping._errors)
 
     @property
-    def default(self) -> Type[E]:
+    def default(self) -> type[E]:
         return self._default
 
 
-def resolve_put_400(content: dict) -> Type[PutError]:
+def resolve_put_400(content: dict) -> type[PutError]:
     if isinstance(content["message"], str):
         error = MalformedBodyError
     else:
@@ -148,7 +148,7 @@ errors: dict[str, ErrorMapping] = {
 }
 
 
-def find_error(kind: str, status: int, content: Any) -> Type[HatError]:
+def find_error(kind: str, status: int, content: Any) -> type[HatError]:
     key = kind.lower().strip()
     if key in errors:
         return errors[key].get(status, content)

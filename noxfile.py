@@ -8,6 +8,7 @@ from textwrap import dedent
 
 import nox
 
+
 try:
     from nox_poetry import Session
     from nox_poetry import session
@@ -94,9 +95,8 @@ def activate_virtualenv_in_precommit_hooks(session: Session) -> None:
         text = hook.read_text()
 
         if not any(
-                Path("A") == Path(
-                    "a") and bindir.lower() in text.lower() or bindir in text
-                for bindir in bindirs
+            Path("A") == Path("a") and bindir.lower() in text.lower() or bindir in text
+            for bindir in bindirs
         ):
             continue
 
@@ -122,7 +122,6 @@ def precommit(session: Session) -> None:
         "black",
         "darglint",
         "flake8",
-        "flake8-bandit",
         "flake8-bugbear",
         "flake8-docstrings",
         "flake8-rst-docstrings",

@@ -1,5 +1,6 @@
 from .active import A
 from .active import ActiveHatModel
+from .active import AsyncActiveHatModel
 from .auth import ApiToken
 from .auth import AppToken
 from .auth import AsyncApiToken
@@ -29,6 +30,7 @@ from .errors import PutError
 from .errors import RecordNotFoundError
 from .errors import WrongCredentialsError
 from .errors import WrongTokenError
+from .http import AsyncHttpClient
 from .model import GetOpts
 from .model import HatConfig
 from .model import HatModel

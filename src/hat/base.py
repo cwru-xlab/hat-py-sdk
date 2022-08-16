@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import abc
-import functools
 import re
 from typing import Any
-from typing import Callable
 from typing import Collection
 from typing import Iterable
 from typing import Iterator
-from typing import Optional
-from typing import Type
+from typing import Mapping
 from typing import Union
 
 from .model import GetOpts
@@ -20,27 +17,6 @@ from .model import M
 Models = Union[M, Iterator[M], Collection[M]]
 StringLike = Union[str, HatModel]
 IStringLike = Iterable[StringLike]
-
-
-def requires_namespace(method: Callable) -> Callable:
-    @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
-        if self.namespace is None:
-            raise ValueError("'namespace' is required to access endpoint data")
-        return method(self, *args, **kwargs)
-
-    return wrapper
-
-
-def ensure_iterable(method: Callable) -> Callable:
-    @functools.wraps(method)
-    def wrapper(self, iterable, *args, **kwargs):
-        # pydantic.BaseModel is an Iterable, so we need to check subclasses.
-        if not isinstance(iterable, (Iterator, Collection)):
-            iterable = [iterable]
-        return method(self, iterable, *args, **kwargs)
-
-    return wrapper
 
 
 class BaseResponseHandler:
@@ -56,17 +32,24 @@ class BaseResponseHandler:
 class HttpAuth:
     __slots__ = ()
 
-    def headers(self) -> dict[str, str]:
+    async def headers(self) -> dict[str, str]:
         return {}
 
-    def on_response(self, response: Any) -> None:
+    async def on_response(self, response: Any) -> None:
         pass
 
 
 class BaseHttpClient(abc.ABC):
     @abc.abstractmethod
     def request(
-        self, method: str, url: str, auth: Optional[HttpAuth] = None, **kwargs
+        self,
+        method: str,
+        url: str,
+        auth: HttpAuth | None = None,
+        headers: Mapping[str, str] | None = None,
+        data: Any = None,
+        params: Mapping[str, str] | None = None,
+        **kwargs,
     ) -> Any:
         pass
 
@@ -84,36 +67,31 @@ class AsyncCachable(abc.ABC):
 class BaseHatClient(abc.ABC):
     __slots__ = "_namespace", "_pattern"
 
-    def __init__(self, namespace: Optional[str] = None):
+    def __init__(self, namespace: str | None = None):
         self._namespace = namespace
         self._pattern = re.compile(rf"^{namespace}/")
 
     @abc.abstractmethod
-    @requires_namespace
     def get(
         self,
         endpoint: StringLike,
-        mtype: Type[M] = HatModel,
-        options: Optional[GetOpts] = None,
+        mtype: type[M] = HatModel,
+        options: GetOpts | None = None,
     ) -> list[M]:
         pass
 
     @abc.abstractmethod
-    @ensure_iterable
-    @requires_namespace
     def post(self, models: Models) -> list[M]:
         pass
 
     @abc.abstractmethod
-    @ensure_iterable
     def put(self, models: Models) -> list[M]:
         pass
 
     @abc.abstractmethod
-    @ensure_iterable
     def delete(self, record_ids: StringLike | IStringLike) -> None:
         pass
 
     @property
-    def namespace(self) -> Optional[str]:
+    def namespace(self) -> str | None:
         return self._namespace

@@ -26,8 +26,12 @@ finally:
 
 
 def match_signature(obj: Callable, **kwargs) -> dict[str, Any]:
-    allowed = inspect.signature(obj).parameters
-    return {k: v for k, v in kwargs.items() if k in allowed}
+    parameters = inspect.signature(obj).parameters
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in parameters.values()):
+        matched = kwargs
+    else:
+        matched = {k: v for k, v in kwargs.items() if k in parameters}
+    return matched
 
 
 def to_str(self: Any, **attrs) -> str:
