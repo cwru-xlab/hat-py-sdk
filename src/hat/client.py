@@ -191,6 +191,7 @@ class HatClient(BaseHatClient):
         super().__init__(wrapped._namespace)
         self._wrapped = wrapped
 
+    @requires_namespace
     def get(
         self,
         endpoint: StringLike,
@@ -199,12 +200,16 @@ class HatClient(BaseHatClient):
     ) -> list[M]:
         return sync.async_to_sync(self._wrapped)(endpoint, mtype, options)
 
+    @ensure_iterable
+    @requires_namespace
     def post(self, models: Models) -> list[M]:
         return sync.async_to_sync(self._wrapped)(models)
 
+    @ensure_iterable
     def put(self, models: Models) -> list[M]:
         return sync.async_to_sync(self._wrapped)(models)
 
+    @ensure_iterable
     def delete(self, record_ids: StringLike | IStringLike) -> None:
         return sync.async_to_sync(self._wrapped)(record_ids)
 
