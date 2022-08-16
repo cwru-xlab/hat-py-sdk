@@ -11,7 +11,7 @@ keywords = ["dataswift", "hat", "python", "sdk"]
 packages = [{ include = "hat", from = "src" }]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.7"
 
 PyJWT = { extras = ["crypto"], version = "^2.4.0" }
 aiohttp = { extras = ["speedups"], version = "^3.8.1" }
