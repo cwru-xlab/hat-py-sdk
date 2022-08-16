@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import inspect
 from typing import Any
 from typing import AnyStr
-from typing import Callable
 
 
 try:
@@ -23,15 +21,6 @@ finally:
 
     def loads(obj: AnyStr, **kwargs) -> dict[str, Any]:
         return json.loads(obj, **kwargs)
-
-
-def match_signature(obj: Callable, **kwargs) -> dict[str, Any]:
-    parameters = inspect.signature(obj).parameters
-    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in parameters.values()):
-        matched = kwargs
-    else:
-        matched = {k: v for k, v in kwargs.items() if k in parameters}
-    return matched
 
 
 def to_str(self: Any, **attrs) -> str:

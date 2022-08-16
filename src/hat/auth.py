@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-import asyncio
 import datetime
 import mimetypes
 import re
@@ -129,10 +128,8 @@ class ApiToken(abc.ABC):
         return self._domain
 
     async def decode(self, *, verify: bool = True) -> JwtToken:
-        if verify:
-            value, pk = await asyncio.gather(self.value(), self.pk())
-        else:
-            value, pk = await self.value(), None
+        value = await self.value()
+        pk = await self.pk() if verify else None
         return self._jwt_type.decode(value, pk=pk, verify=verify)
 
     @abc.abstractmethod

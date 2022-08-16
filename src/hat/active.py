@@ -21,10 +21,7 @@ class AsyncActiveHatModel(HatModel):
         if endpoint is not None:
             self.endpoint = endpoint
         has_id = self.record_id is not None
-        if has_id:
-            method = self._client().put
-        else:
-            method = self._client().post
+        method = self._client().put if has_id else self._client().post
         try:
             saved = await method(self)
         except errors.PutError as error:

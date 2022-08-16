@@ -139,21 +139,21 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     async def post(self, models: Models) -> list[M]:
         posted = await asyncio.gather(
             *(
-                self._endpoint_request("POST", endpoint, data=models, mtypes=mtypes)
-                for endpoint, models, mtypes in self._prepare_post(models)
+                self._endpoint_request("POST", endpoint, data=data, mtypes=mtypes)
+                for endpoint, data, mtypes in self._prepare_post(models)
             )
         )
         return list(itertools.chain.from_iterable(posted))
 
     @ensure_iterable
     async def put(self, models: Models) -> list[M]:
-        put, mtypes = self._prepare_put(models)
-        return await self._data_request("PUT", data=put, mytpes=mtypes)
+        data, mtypes = self._prepare_put(models)
+        return await self._data_request("PUT", data=data, mytpes=mtypes)
 
     @ensure_iterable
     async def delete(self, record_ids: StringLike | IStringLike) -> None:
-        delete = self._prepare_delete(record_ids)
-        return await self._data_request("DELETE", params=delete)
+        params = self._prepare_delete(record_ids)
+        return await self._data_request("DELETE", params=params)
 
     async def _endpoint_request(self, method: str, endpoint: str, **kwargs) -> list[M]:
         url = urls.domain_endpoint(
