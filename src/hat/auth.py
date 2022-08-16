@@ -5,17 +5,12 @@ import asyncio
 import datetime
 import mimetypes
 import re
-from typing import TYPE_CHECKING
 from typing import Any
 
-
-if TYPE_CHECKING:
-    from aiohttp import ClientResponse
-    from .http import HttpClient
-    from keyring.credentials import Credential
-
 import jwt
+from aiohttp import ClientResponse
 from asgiref import sync
+from keyring.credentials import Credential
 from pydantic import BaseModel
 from pydantic import PositiveInt
 from pydantic import StrictStr
@@ -24,6 +19,7 @@ from pydantic import constr
 from . import errors
 from . import urls
 from . import utils
+from .http import HttpClient
 from .model import ApiConfig
 
 
