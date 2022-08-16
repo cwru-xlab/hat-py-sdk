@@ -73,11 +73,11 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
         if not isinstance(records, list):
             records = [records]
         # When more records exist than model types, try binding to the last one.
-        mtypes, m = iter(mtypes), None
+        mtypes, mtype = iter(mtypes), None
         models = []
-        for rec in records:
-            m = next(mtypes, m)
-            models.append(cls._to_model(rec, m))
+        for record in records:
+            mtype = next(mtypes, mtype)
+            models.append(cls._to_model(record, mtype))
         return models
 
     @classmethod
