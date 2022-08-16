@@ -19,8 +19,6 @@ from .base import (AsyncCachable, BaseHatClient, BaseHttpClient,
                    StringLike)
 from .model import GetOpts, HatModel, HatRecord, M
 
-MTypes = Iterable[Type[M]]
-
 NEVER_CACHE = 0
 SESSION_DEFAULTS = {
     "headers": {"Content-Type": mimetypes.types_map[".json"]},
@@ -52,10 +50,6 @@ def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
     return ((endpoint, list(models)) for endpoint, models in groups)
 
 
-def types(models: Iterable[M]) -> MTypes:
-    return (type(m) for m in models)
-
-
 class AsyncResponseHandler(BaseResponseHandler):
 
     async def on_success(
@@ -76,25 +70,15 @@ class AsyncResponseHandler(BaseResponseHandler):
 
     async def on_error(self, error: ClientResponseError, **kwargs) -> None:
         url = str(error.request_info.url)
+        status = error.status
+        content = utils.loads(error.message)
         if urls.is_auth_endpoint(url):
-            status = self._status(error)
-            content = self._content(error)
             raise errors.find_error("auth", status, content)
         elif urls.is_api_endpoint(url):
             method = error.request_info.method.lower()
-            status = self._status(error)
-            content = self._content(error)
             raise errors.find_error(method, status, content)
         else:
             raise error
-
-    @staticmethod
-    def _status(error: ClientResponseError) -> int:
-        return error.status
-
-    @staticmethod
-    def _content(error: ClientResponseError) -> dict[str, Any]:
-        return utils.loads(error.message)
 
 
 class AsyncHttpClient(BaseHttpClient, AsyncCachable,
@@ -116,7 +100,8 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable,
     @staticmethod
     def _new_session(**kwargs) -> ClientSession:
         kwargs = SESSION_DEFAULTS | kwargs
-        return CachedSession(cache=CacheBackend(**kwargs), **kwargs)
+        cache = kwargs.pop("cache", None) or CacheBackend(**kwargs)
+        return CachedSession(cache=cache, **kwargs)
 
     async def request(
             self,
@@ -191,8 +176,8 @@ class AsyncHatClient(BaseHatClient):
         return list(itertools.chain(posted))
 
     async def put(self, models: Models) -> list[M]:
-        put = self._prepare_put(models)
-        return await self._data_request("PUT", data=put, mytpes=types(models))
+        put, mtypes = self._prepare_put(models)
+        return await self._data_request("PUT", data=put, mytpes=mtypes)
 
     async def delete(self, record_ids: StringLike | IStringLike) -> None:
         delete = self._prepare_delete(record_ids)
@@ -226,9 +211,9 @@ class AsyncHatClient(BaseHatClient):
             formatted.append(m)
         for endpoint, models in group_by_endpoint(formatted):
             records = HatRecord.to_json(models, data_only=True)
-            yield endpoint, records, types(models)
+            yield endpoint, records, map(type, models)
 
-    def _prepare_put(self, models: Iterable[M]) -> str:
+    def _prepare_put(self, models: Iterable[M]) -> tuple[str, Iterable[Type]]:
         formatted = []
         for m in require_endpoint(models):
             # The endpoint should include the namespace. HatRecords created
@@ -237,7 +222,7 @@ class AsyncHatClient(BaseHatClient):
             if self._pattern.match(m.endpoint) is None:
                 m.endpoint = f"{self._namespace}/{m.endpoint}"
             formatted.append(m)
-        return HatRecord.to_json(formatted)
+        return HatRecord.to_json(formatted), map(type, models)
 
     @staticmethod
     def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:
