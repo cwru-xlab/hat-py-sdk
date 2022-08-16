@@ -1,0 +1,6 @@
+[flake8]
+select = B,B9,BLK,C,E,F,I,W
+max-complexity = 10
+max-line-length = 88
+application-import-names = hat
+import-order-style = google
