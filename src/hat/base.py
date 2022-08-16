@@ -3,8 +3,7 @@ from __future__ import annotations
 import abc
 import functools
 import re
-from typing import (Any, Callable, Collection, Iterable, Iterator, Optional,
-                    Type, Union)
+from typing import Any, Callable, Collection, Iterable, Iterator, Optional, Type, Union
 
 from .model import GetOpts, HatModel, M
 
@@ -55,14 +54,9 @@ class HttpAuth:
 
 
 class BaseHttpClient(abc.ABC):
-
     @abc.abstractmethod
     def request(
-            self,
-            method: str,
-            url: str,
-            auth: Optional[HttpAuth] = None,
-            **kwargs
+        self, method: str, url: str, auth: Optional[HttpAuth] = None, **kwargs
     ) -> Any:
         pass
 
@@ -72,7 +66,6 @@ class BaseHttpClient(abc.ABC):
 
 
 class AsyncCachable(abc.ABC):
-
     @abc.abstractmethod
     async def clear_cache(self) -> None:
         pass
@@ -88,10 +81,10 @@ class BaseHatClient(abc.ABC):
     @abc.abstractmethod
     @requires_namespace
     def get(
-            self,
-            endpoint: StringLike,
-            mtype: Type[M] = HatModel,
-            options: Optional[GetOpts] = None
+        self,
+        endpoint: StringLike,
+        mtype: Type[M] = HatModel,
+        options: Optional[GetOpts] = None,
     ) -> list[M]:
         pass
 

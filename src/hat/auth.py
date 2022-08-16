@@ -32,12 +32,12 @@ class JwtToken(BaseModel):
 
     @classmethod
     def decode(
-            cls,
-            encoded: str,
-            *,
-            pk: Optional[str] = None,
-            verify: bool = False,
-            as_token: bool = False
+        cls,
+        encoded: str,
+        *,
+        pk: Optional[str] = None,
+        verify: bool = False,
+        as_token: bool = False,
     ) -> dict | JwtToken:
         if verify and pk is None:
             raise ValueError("'pk' is required if 'verify' is True")
@@ -48,7 +48,8 @@ class JwtToken(BaseModel):
                 jwt=encoded,
                 key=pk,
                 algorithms=["RS256"],
-                options={"verify_signature": verify})
+                options={"verify_signature": verify},
+            )
         except jwt.InvalidTokenError as e:
             raise errors.AuthError(e)
         return payload if not as_token else JwtToken(**payload)
@@ -82,7 +83,8 @@ class BaseApiToken(abc.ABC):
         "_pk",
         "_ttl",
         "_domain",
-        "_expires")
+        "_expires",
+    )
 
     def __init__(self, auth: HttpAuth, jwt_type: Type[JwtToken]) -> None:
         self._auth = auth
@@ -129,20 +131,15 @@ class BaseApiToken(abc.ABC):
 
     def __repr__(self) -> str:
         return utils.to_str(
-            self,
-            domain=self._domain,
-            expired=self.expired,
-            expires=self._expires)
+            self, domain=self._domain, expired=self.expired, expires=self._expires
+        )
 
 
 class AsyncApiToken(BaseApiToken, abc.ABC):
     __slots__ = "_client"
 
     def __init__(
-            self,
-            client: AsyncHttpClient,
-            auth: HttpAuth,
-            jwt_type: Type[JwtToken]
+        self, client: AsyncHttpClient, auth: HttpAuth, jwt_type: Type[JwtToken]
     ) -> None:
         super().__init__(auth, jwt_type)
         self._client = client
@@ -194,10 +191,10 @@ class AsyncAppToken(AsyncApiToken):
     __slots__ = "_owner_token", "_app_id", "_url"
 
     def __init__(
-            self,
-            client: AsyncHttpClient,
-            owner_token: AsyncCredentialOwnerToken,
-            app_id: str
+        self,
+        client: AsyncHttpClient,
+        owner_token: AsyncCredentialOwnerToken,
+        app_id: str,
     ) -> None:
         super().__init__(client, AsyncTokenAuth(owner_token), JwtAppToken)
         self._owner_token = owner_token
@@ -267,7 +264,7 @@ class AsyncTokenAuth(HttpAuth):
 
 
 class CredentialAuth(HttpAuth):
-    __slots__ = "_credential",
+    __slots__ = ("_credential",)
 
     def __init__(self, credential: Credential):
         self._credential = credential
@@ -276,4 +273,5 @@ class CredentialAuth(HttpAuth):
         return {
             "Accept": mimetypes.types_map[".json"],
             "username": self._credential.username,
-            "password": self._credential.password}
+            "password": self._credential.password,
+        }

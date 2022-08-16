@@ -7,8 +7,15 @@ from typing import Any, AnyStr, Generic, Iterable, Optional, Type, TypeVar
 import pydantic
 import ulid
 from humps import camel
-from pydantic import (BaseConfig, BaseModel, Field, NonNegativeInt, StrictStr,
-                      conint, constr)
+from pydantic import (
+    BaseConfig,
+    BaseModel,
+    Field,
+    NonNegativeInt,
+    StrictStr,
+    conint,
+    constr,
+)
 from pydantic.generics import GenericModel
 
 from . import utils
@@ -96,7 +103,8 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
         return cls(
             endpoint=model.endpoint,
             record_id=model.record_id,
-            data=model.dict(exclude=set(BaseHatModel.__fields__)))
+            data=model.dict(exclude=set(BaseHatModel.__fields__)),
+        )
 
 
 class Ordering(str, Enum):

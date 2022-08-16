@@ -38,9 +38,7 @@ class AsyncActiveHatModel(HatModel):
 
     @classmethod
     async def get(
-            cls,
-            endpoint: StringLike,
-            options: Optional[GetOpts] = None
+        cls, endpoint: StringLike, options: Optional[GetOpts] = None
     ) -> list[A]:
         return await cls._client().get(endpoint, cls, options)
 
@@ -68,11 +66,7 @@ class ActiveHatModel(HatModel):
         return sync.async_to_sync(cls._client().delete)(models)
 
     @classmethod
-    def get(
-            cls,
-            endpoint: StringLike,
-            options: Optional[GetOpts] = None
-    ) -> list[S]:
+    def get(cls, endpoint: StringLike, options: Optional[GetOpts] = None) -> list[S]:
         return sync.async_to_sync(cls._client().get)(endpoint, cls, options)
 
     @classmethod

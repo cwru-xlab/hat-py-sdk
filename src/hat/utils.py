@@ -6,20 +6,18 @@ from typing import Any, AnyStr, Callable
 try:
     import orjson as json
 
-
     def dumps(obj: Any, **kwargs) -> str:
         # Ref: https://pydantic-docs.helpmanual.io/usage/exporting_models
         return json.dumps(obj, **kwargs).decode()
 
-
 except ImportError:
     import json
-
 
     def dumps(obj, **kwargs):
         return json.dumps(obj, **kwargs)
 
 finally:
+
     def loads(obj: AnyStr, **kwargs) -> dict[str, Any]:
         return json.loads(obj, **kwargs)
 

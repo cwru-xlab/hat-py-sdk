@@ -83,10 +83,10 @@ class ErrorMapping(Generic[E]):
         return error if resolver is None else resolver(content)
 
     def put(
-            self,
-            status: int,
-            error: Optional[Type[E]] = None,
-            resolver: Optional[Resolver] = None
+        self,
+        status: int,
+        error: Optional[Type[E]] = None,
+        resolver: Optional[Resolver] = None,
     ) -> None:
         if not (error is None) ^ (resolver is None):
             raise ValueError("Either 'error' or 'resolver' must be specified")
@@ -139,7 +139,8 @@ errors: dict[str, ErrorMapping] = {
     "get": get_errors,
     "post": post_errors,
     "put": put_errors,
-    "delete": delete_errors}
+    "delete": delete_errors,
+}
 
 
 def find_error(kind: str, status: int, content: Any) -> Type[HatError]:
@@ -147,5 +148,4 @@ def find_error(kind: str, status: int, content: Any) -> Type[HatError]:
     if key in errors:
         return errors[key].get(status, content)
     else:
-        raise ValueError(
-            f"'kind' must be one of {list(errors.keys())}; got {kind}")
+        raise ValueError(f"'kind' must be one of {list(errors.keys())}; got {kind}")
