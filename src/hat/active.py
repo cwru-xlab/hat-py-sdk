@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar, Optional, TypeVar
+from typing import Any
+from typing import ClassVar
+from typing import Optional
+from typing import TypeVar
 
 from asgiref import sync
 
 from . import errors
-from .client import AsyncHatClient, Models, StringLike
-from .model import GetOpts, HatModel
+from .client import AsyncHatClient
+from .client import Models
+from .client import StringLike
+from .model import GetOpts
+from .model import HatModel
 
 
 class AsyncActiveHatModel(HatModel):

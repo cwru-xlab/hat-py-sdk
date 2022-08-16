@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, AnyStr, Callable
+from typing import Any
+from typing import AnyStr
+from typing import Callable
+
 
 try:
     import orjson as json

@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import collections
-from typing import Any, Callable, Generic, Optional, Type, TypeVar
+from typing import Any
+from typing import Callable
+from typing import Generic
+from typing import Optional
+from typing import Type
+from typing import TypeVar
 
 
 class HatError(Exception):

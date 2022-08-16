@@ -1,30 +1,46 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import AbstractAsyncContextManager
 import datetime
 import functools
 import itertools
 import mimetypes
 import pprint
-from contextlib import AbstractAsyncContextManager
-from typing import Any, Generator, Iterable, Iterator, Optional, Type
 
-from aiohttp import ClientResponse, ClientResponseError, ClientSession
-from aiohttp_client_cache import CacheBackend, CachedSession
+from typing import Any
+from typing import Generator
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Type
+
+from aiohttp import ClientResponse
+from aiohttp import ClientResponseError
+from aiohttp import ClientSession
+from aiohttp_client_cache import CacheBackend
+from aiohttp_client_cache import CachedSession
 from asgiref import sync
 
-from . import AsyncApiToken, AsyncTokenAuth, auth as _auth, errors, urls, utils
-from .base import (
-    AsyncCachable,
-    BaseHatClient,
-    BaseHttpClient,
-    BaseResponseHandler,
-    HttpAuth,
-    IStringLike,
-    Models,
-    StringLike,
-)
-from .model import GetOpts, HatModel, HatRecord, M
+from . import AsyncApiToken
+from . import AsyncTokenAuth
+from . import auth as _auth
+from . import errors
+from . import urls
+from . import utils
+from .base import AsyncCachable
+from .base import BaseHatClient
+from .base import BaseHttpClient
+from .base import BaseResponseHandler
+from .base import HttpAuth
+from .base import IStringLike
+from .base import Models
+from .base import StringLike
+from .model import GetOpts
+from .model import HatModel
+from .model import HatRecord
+from .model import M
+
 
 NEVER_CACHE = 0
 SESSION_DEFAULTS = {

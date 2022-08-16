@@ -3,9 +3,19 @@ from __future__ import annotations
 import abc
 import functools
 import re
-from typing import Any, Callable, Collection, Iterable, Iterator, Optional, Type, Union
+from typing import Any
+from typing import Callable
+from typing import Collection
+from typing import Iterable
+from typing import Iterator
+from typing import Optional
+from typing import Type
+from typing import Union
 
-from .model import GetOpts, HatModel, M
+from .model import GetOpts
+from .model import HatModel
+from .model import M
+
 
 Models = Union[M, Iterator[M], Collection[M]]
 StringLike = Union[str, HatModel]

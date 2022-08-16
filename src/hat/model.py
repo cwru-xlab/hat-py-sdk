@@ -2,20 +2,24 @@ from __future__ import annotations
 
 from abc import ABC
 from enum import Enum
-from typing import Any, AnyStr, Generic, Iterable, Optional, Type, TypeVar
+from typing import Any
+from typing import AnyStr
+from typing import Generic
+from typing import Iterable
+from typing import Optional
+from typing import Type
+from typing import TypeVar
 
 import pydantic
 import ulid
 from humps import camel
-from pydantic import (
-    BaseConfig,
-    BaseModel,
-    Field,
-    NonNegativeInt,
-    StrictStr,
-    conint,
-    constr,
-)
+from pydantic import BaseConfig
+from pydantic import BaseModel
+from pydantic import conint
+from pydantic import constr
+from pydantic import Field
+from pydantic import NonNegativeInt
+from pydantic import StrictStr
 from pydantic.generics import GenericModel
 
 from . import utils

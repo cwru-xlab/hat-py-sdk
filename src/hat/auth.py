@@ -5,18 +5,25 @@ import asyncio
 import datetime
 import mimetypes
 import re
-from typing import Optional, Type
+from typing import Optional, TYPE_CHECKING, Type
+
+if TYPE_CHECKING:
+    from aiohttp import ClientResponse
+    from .client import AsyncHttpClient
+    from keyring.credentials import Credential
+
+from asgiref import sync
 
 import jwt
-from aiohttp import ClientResponse
-from asgiref import sync
-from keyring.credentials import Credential
-from pydantic import BaseModel, PositiveInt, StrictStr, constr
 
-from base import HttpAuth
-from . import errors, urls, utils
-from .client import AsyncHttpClient
+from pydantic import BaseModel, constr, PositiveInt, StrictStr
+
+from . import errors
+from . import urls
+from . import utils
+from .base import HttpAuth
 from .model import ApiConfig
+
 
 JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
 TOKEN_KEY = "accessToken"
@@ -26,7 +33,7 @@ TOKEN_HEADER = "x-auth-token"
 class JwtToken(BaseModel):
     exp: PositiveInt
     iat: PositiveInt
-    iss: constr(regex=r"^\w+\.hubat\.net$", strict=True)
+    iss: constr(regex=r"^\w+\.hubat\.net$", strict=True)  # noqa: F722
 
     Config = ApiConfig
 
@@ -50,13 +57,13 @@ class JwtToken(BaseModel):
                 algorithms=["RS256"],
                 options={"verify_signature": verify},
             )
-        except jwt.InvalidTokenError as e:
-            raise errors.AuthError(e)
+        except jwt.InvalidTokenError as error:
+            raise errors.AuthError() from error
         return payload if not as_token else JwtToken(**payload)
 
 
 class JwtOwnerToken(JwtToken):
-    access_scope: constr(regex="^owner$", strict=True)
+    access_scope: constr(regex="^owner$", strict=True)  # noqa: F722
 
     @classmethod
     def decode(cls, encoded: str, **kwargs) -> JwtOwnerToken:
@@ -66,7 +73,7 @@ class JwtOwnerToken(JwtToken):
 
 class JwtAppToken(JwtToken):
     application: StrictStr
-    application_version: constr(regex=r"^\d+.\d+.\d+$", strict=True)
+    application_version: constr(regex=r"^\d+.\d+.\d+$", strict=True)  # noqa: F722
 
     @classmethod
     def decode(cls, encoded: str, **kwargs) -> JwtAppToken:
@@ -139,7 +146,7 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
     __slots__ = "_client"
 
     def __init__(
-        self, client: AsyncHttpClient, auth: HttpAuth, jwt_type: Type[JwtToken]
+        self, client: "AsyncHttpClient", auth: HttpAuth, jwt_type: Type[JwtToken]
     ) -> None:
         super().__init__(auth, jwt_type)
         self._client = client
@@ -179,7 +186,7 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
 class AsyncCredentialOwnerToken(AsyncApiToken):
     __slots__ = "_url"
 
-    def __init__(self, client: AsyncHttpClient, credential: Credential) -> None:
+    def __init__(self, client: "AsyncHttpClient", credential: "Credential") -> None:
         super().__init__(client, CredentialAuth(credential), JwtOwnerToken)
         self._url = urls.username_owner_token(credential.username)
 
@@ -192,7 +199,7 @@ class AsyncAppToken(AsyncApiToken):
 
     def __init__(
         self,
-        client: AsyncHttpClient,
+        client: "AsyncHttpClient",
         owner_token: AsyncCredentialOwnerToken,
         app_id: str,
     ) -> None:
@@ -258,7 +265,7 @@ class AsyncTokenAuth(HttpAuth):
     async def headers(self) -> dict[str, str]:
         return {TOKEN_HEADER: await self._token.value()}
 
-    async def on_response(self, response: ClientResponse) -> None:
+    async def on_response(self, response: "ClientResponse") -> None:
         if TOKEN_HEADER in response.headers:
             await self._token.set_value(response.headers[TOKEN_HEADER])
 
@@ -266,7 +273,7 @@ class AsyncTokenAuth(HttpAuth):
 class CredentialAuth(HttpAuth):
     __slots__ = ("_credential",)
 
-    def __init__(self, credential: Credential):
+    def __init__(self, credential: "Credential"):
         self._credential = credential
 
     def headers(self) -> dict[str, str]:
