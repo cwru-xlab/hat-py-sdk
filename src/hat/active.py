@@ -7,8 +7,8 @@ from typing import TypeVar
 from asgiref import sync
 
 from . import errors
-from .base import IStringLike
 from .client import AsyncHatClient
+from .client import IStringLike
 from .client import StringLike
 from .model import GetOpts
 from .model import HatModel

@@ -30,7 +30,7 @@ from .errors import PutError
 from .errors import RecordNotFoundError
 from .errors import WrongCredentialsError
 from .errors import WrongTokenError
-from .http import AsyncHttpClient
+from .http import HttpClient
 from .model import GetOpts
 from .model import HatConfig
 from .model import HatModel

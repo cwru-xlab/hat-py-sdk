@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import abc
 import asyncio
 import functools
 import itertools
+import re
 from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractContextManager
 from typing import Callable
 from typing import Collection
 from typing import Generator
 from typing import Iterable
 from typing import Iterator
+from typing import Union
 
 from asgiref import sync
 
@@ -16,15 +20,16 @@ from . import urls
 from . import utils
 from .auth import AsyncApiToken
 from .auth import AsyncTokenAuth
-from .base import BaseHatClient
-from .base import IStringLike
-from .base import Models
-from .base import StringLike
-from .http import AsyncHttpClient
+from .http import HttpClient
 from .model import GetOpts
 from .model import HatModel
 from .model import HatRecord
 from .model import M
+
+
+Models = Union[M, Iterator[M], Collection[M]]
+StringLike = Union[str, HatModel]
+IStringLike = Iterable[StringLike]
 
 
 def requires_namespace(method: Callable) -> Callable:
@@ -68,12 +73,45 @@ def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
     return ((endpoint, list(models)) for endpoint, models in groups)
 
 
+class BaseHatClient(abc.ABC):
+    __slots__ = "_namespace", "_pattern"
+
+    def __init__(self, namespace: str | None = None):
+        self._namespace = namespace
+        self._pattern = re.compile(rf"^{namespace}/")
+
+    @abc.abstractmethod
+    def get(
+        self,
+        endpoint: StringLike,
+        mtype: type[M] = HatModel,
+        options: GetOpts | None = None,
+    ) -> list[M]:
+        pass
+
+    @abc.abstractmethod
+    def post(self, models: Models) -> list[M]:
+        pass
+
+    @abc.abstractmethod
+    def put(self, models: Models) -> list[M]:
+        pass
+
+    @abc.abstractmethod
+    def delete(self, record_ids: StringLike | IStringLike) -> None:
+        pass
+
+    @property
+    def namespace(self) -> str | None:
+        return self._namespace
+
+
 class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     __slots__ = "_client", "_auth", "_token"
 
     def __init__(
         self,
-        client: AsyncHttpClient,
+        client: HttpClient,
         token: AsyncApiToken,
         namespace: str | None = None,
     ) -> None:
@@ -184,7 +222,7 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
         return utils.to_str(self, token=self._token, namespace=self._namespace)
 
 
-class HatClient(BaseHatClient):
+class HatClient(BaseHatClient, AbstractContextManager):
     __slots__ = "_wrapped"
 
     def __init__(self, wrapped: AsyncHatClient):
@@ -218,3 +256,10 @@ class HatClient(BaseHatClient):
 
     def __repr__(self) -> str:
         return utils.to_str(self, token=self._wrapped.token, namespace=self._namespace)
+
+    def __enter__(self) -> HatClient:
+        sync.async_to_sync(self._wrapped.__aenter__)()
+        return self
+
+    def __exit__(self, *args) -> None:
+        return sync.async_to_sync(self._wrapped.__aexit__)(*args)

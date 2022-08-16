@@ -17,10 +17,6 @@ from . import auth as _auth
 from . import errors
 from . import urls
 from . import utils
-from .base import AsyncCachable
-from .base import BaseHttpClient
-from .base import BaseResponseHandler
-from .base import HttpAuth
 from .model import HatRecord
 from .model import M
 
@@ -38,10 +34,9 @@ SESSION_DEFAULTS = {
 }
 
 
-class AsyncResponseHandler(BaseResponseHandler):
-    async def on_success(
-        self, response: ClientResponse, **kwargs
-    ) -> str | list[M] | None:
+class ResponseHandler:
+    @staticmethod
+    async def on_success(response: ClientResponse, **kwargs) -> str | list[M] | None:
         url = str(response.url)
         if urls.is_pk_endpoint(url):
             return await response.text()
@@ -55,7 +50,8 @@ class AsyncResponseHandler(BaseResponseHandler):
             headers = pprint.pformat(response.headers, indent=2)
             raise ValueError(f"Unable to process response for URL {url}\n{headers}")
 
-    async def on_error(self, error: ClientResponseError, **kwargs) -> None:
+    @staticmethod
+    async def on_error(error: ClientResponseError, **kwargs) -> None:
         url = str(error.request_info.url)
         status = error.status
         content = utils.loads(error.message)
@@ -68,20 +64,18 @@ class AsyncResponseHandler(BaseResponseHandler):
             raise error
 
 
-class AsyncHttpClient(BaseHttpClient, AsyncCachable, AbstractAsyncContextManager):
+class HttpClient(AbstractAsyncContextManager):
     __slots__ = "_session", "_handler", "_auth"
 
     def __init__(
         self,
         session: ClientSession | None = None,
-        handler: AsyncResponseHandler | None = None,
-        auth: HttpAuth | None = None,
+        auth: _auth.HttpAuth | None = None,
         **kwargs,
     ) -> None:
-        super().__init__()
         self._session = session or self._new_session(**kwargs)
-        self._handler = handler or AsyncResponseHandler()
-        self._auth = auth or HttpAuth()
+        self._handler = ResponseHandler()
+        self._auth = auth or _auth.HttpAuth()
 
     @staticmethod
     def _new_session(**kwargs) -> ClientSession:
@@ -93,7 +87,7 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable, AbstractAsyncContextManager
         self,
         method: str,
         url: str,
-        auth: HttpAuth | None = None,
+        auth: _auth.HttpAuth | None = None,
         headers: Mapping[str, str] | None = None,
         data: Any = None,
         params: Mapping[str, str] | None = None,
@@ -105,12 +99,12 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable, AbstractAsyncContextManager
         async with self._session.request(
             method, url, headers=headers, data=data, params=params
         ) as response:
-            await auth.on_response(response)
             try:
                 response.raise_for_status()
             except ClientResponseError as error:
                 result = await self._handler.on_error(error, **kwargs)
             else:
+                await auth.on_response(response)
                 result = await self._handler.on_success(response, **kwargs)
             return result
 
@@ -121,7 +115,7 @@ class AsyncHttpClient(BaseHttpClient, AsyncCachable, AbstractAsyncContextManager
         if isinstance(self._session, CachedSession):
             return await self._session.cache.clear()
 
-    async def __aenter__(self) -> AsyncHttpClient:
+    async def __aenter__(self) -> HttpClient:
         await self._session.__aenter__()
         return self
 

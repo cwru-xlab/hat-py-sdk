@@ -6,11 +6,12 @@ import datetime
 import mimetypes
 import re
 from typing import TYPE_CHECKING
+from typing import Any
 
 
 if TYPE_CHECKING:
     from aiohttp import ClientResponse
-    from .http import AsyncHttpClient
+    from .http import HttpClient
     from keyring.credentials import Credential
 
 import jwt
@@ -23,7 +24,6 @@ from pydantic import constr
 from . import errors
 from . import urls
 from . import utils
-from .base import HttpAuth
 from .model import ApiConfig
 
 
@@ -148,7 +148,7 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
     __slots__ = "_client"
 
     def __init__(
-        self, client: AsyncHttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
+        self, client: HttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
     ) -> None:
         super().__init__(auth, jwt_type)
         self._client = client
@@ -188,7 +188,7 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
 class AsyncCredentialOwnerToken(AsyncApiToken):
     __slots__ = "_url"
 
-    def __init__(self, client: AsyncHttpClient, credential: Credential) -> None:
+    def __init__(self, client: HttpClient, credential: Credential) -> None:
         super().__init__(client, CredentialAuth(credential), JwtOwnerToken)
         self._url = urls.username_owner_token(credential.username)
 
@@ -201,7 +201,7 @@ class AsyncAppToken(AsyncApiToken):
 
     def __init__(
         self,
-        client: AsyncHttpClient,
+        client: HttpClient,
         owner_token: AsyncCredentialOwnerToken,
         app_id: str,
     ) -> None:
@@ -256,6 +256,16 @@ class AsyncWebOwnerToken(AsyncApiToken, abc.ABC):  # TODO
 
 class WebOwnerToken(BaseApiToken, abc.ABC):  # TODO
     pass
+
+
+class HttpAuth:
+    __slots__ = ()
+
+    async def headers(self) -> dict[str, str]:
+        return {}
+
+    async def on_response(self, response: Any) -> None:
+        pass
 
 
 class AsyncTokenAuth(HttpAuth):
