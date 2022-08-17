@@ -9,7 +9,6 @@ from asgiref import sync
 
 from . import errors
 from .client import AsyncHatClient
-from .client import BaseHatClient
 from .client import IStringLike
 from .client import StringLike
 from .model import GetOpts
@@ -18,7 +17,7 @@ from .model import M
 
 
 class BaseActiveHatModel(HatModel, abc.ABC):
-    client: ClassVar[BaseHatClient]
+    client: ClassVar[AsyncHatClient]
 
     @abc.abstractmethod
     def save(self, endpoint: str | None = None) -> M:
@@ -38,10 +37,13 @@ class BaseActiveHatModel(HatModel, abc.ABC):
     def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[M]:
         pass
 
+    @classmethod
+    def _client(cls) -> AsyncHatClient:
+        # ClassVar interferes with type checking.
+        return cls.client
+
 
 class AsyncActiveHatModel(BaseActiveHatModel):
-    client: ClassVar[AsyncHatClient]
-
     async def save(self, endpoint: str | None = None) -> A:
         if endpoint is not None:
             self.endpoint = endpoint
@@ -67,15 +69,8 @@ class AsyncActiveHatModel(BaseActiveHatModel):
     async def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[A]:
         return await cls._client().get(endpoint, cls, options)
 
-    @classmethod
-    def _client(cls) -> AsyncHatClient:
-        # ClassVar interferes with type checking.
-        return cls.client
-
 
 class ActiveHatModel(BaseActiveHatModel):
-    client: ClassVar[AsyncHatClient]
-
     def __init__(self, **data: Any):
         super().__init__(**data)
         self._wrapped = AsyncActiveHatModel(**data)
@@ -93,11 +88,6 @@ class ActiveHatModel(BaseActiveHatModel):
     @classmethod
     def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[S]:
         return sync.async_to_sync(cls._client().get)(endpoint, cls, options)
-
-    @classmethod
-    def _client(cls) -> AsyncHatClient:
-        # ClassVar interferes with type checking.
-        return cls.client
 
 
 A = TypeVar("A", bound=AsyncActiveHatModel)
