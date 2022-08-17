@@ -104,6 +104,9 @@ class BaseHatClient(abc.ABC):
     def namespace(self) -> str | None:
         pass
 
+    def __repr__(self) -> str:
+        return utils.to_str(self, token=self.token, namespace=self.namespace)
+
 
 class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     __slots__ = "_client", "_auth", "_token", "_namespace", "_pattern"
@@ -223,9 +226,6 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     async def __aexit__(self, *args) -> None:
         return await self._client.__aexit__(*args)
 
-    def __repr__(self) -> str:
-        return utils.to_str(self, token=self._token, namespace=self._namespace)
-
 
 class HatClient(BaseHatClient, AbstractContextManager):
     __slots__ = "_wrapped"
@@ -265,10 +265,6 @@ class HatClient(BaseHatClient, AbstractContextManager):
     @property
     def namespace(self) -> str | None:
         return self._wrapped.namespace
-
-    def __repr__(self) -> str:
-        repr(self._wrapped)
-        return utils.to_str(self, token=self.token, namespace=self.namespace)
 
     def __enter__(self) -> HatClient:
         sync.async_to_sync(self._wrapped.__aenter__)()
