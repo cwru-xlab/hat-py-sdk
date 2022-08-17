@@ -73,12 +73,6 @@ def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
 
 
 class BaseHatClient(abc.ABC):
-    __slots__ = "_namespace", "_pattern"
-
-    def __init__(self, namespace: str | None = None):
-        self._namespace = namespace
-        self._pattern = re.compile(rf"^{namespace}/")
-
     @abc.abstractmethod
     def get(
         self,
@@ -101,12 +95,18 @@ class BaseHatClient(abc.ABC):
         pass
 
     @property
+    @abc.abstractmethod
+    def token(self) -> ApiToken:
+        pass
+
+    @property
+    @abc.abstractmethod
     def namespace(self) -> str | None:
-        return self._namespace
+        pass
 
 
 class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
-    __slots__ = "_client", "_auth", "_token"
+    __slots__ = "_client", "_auth", "_token", "_namespace", "_pattern"
 
     def __init__(
         self,
@@ -118,6 +118,8 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
         self._client = client
         self._token = token
         self._auth = TokenAuth(token)
+        self._namespace = namespace
+        self._pattern = re.compile(rf"^{namespace}/")
 
     @requires_namespace
     async def get(
@@ -207,6 +209,10 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     def token(self) -> ApiToken:
         return self._token
 
+    @property
+    def namespace(self) -> str | None:
+        return self._namespace
+
     def to_sync(self) -> HatClient:
         return HatClient(self)
 
@@ -225,7 +231,6 @@ class HatClient(BaseHatClient, AbstractContextManager):
     __slots__ = "_wrapped"
 
     def __init__(self, wrapped: AsyncHatClient):
-        super().__init__(wrapped._namespace)
         self._wrapped = wrapped
 
     @requires_namespace
@@ -253,8 +258,17 @@ class HatClient(BaseHatClient, AbstractContextManager):
     def to_async(self) -> AsyncHatClient:
         return self._wrapped
 
+    @property
+    def token(self) -> ApiToken:
+        return self._wrapped.token
+
+    @property
+    def namespace(self) -> str | None:
+        return self._wrapped.namespace
+
     def __repr__(self) -> str:
-        return utils.to_str(self, token=self._wrapped.token, namespace=self._namespace)
+        repr(self._wrapped)
+        return utils.to_str(self, token=self.token, namespace=self.namespace)
 
     def __enter__(self) -> HatClient:
         sync.async_to_sync(self._wrapped.__aenter__)()
