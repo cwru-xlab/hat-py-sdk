@@ -39,8 +39,7 @@ class BaseActiveHatModel(HatModel, abc.ABC):
 
     @classmethod
     def _client(cls) -> AsyncHatClient:
-        # ClassVar interferes with type checking.
-        return cls.client
+        return cls.client  # ClassVar interferes with type checking.
 
 
 class AsyncActiveHatModel(BaseActiveHatModel):
