@@ -128,13 +128,8 @@ class HttpClient(AbstractAsyncContextManager):
         return await self._session.close()
 
     async def clear_cache(self) -> None:
-        try:
-            from aiohttp_client_cache import CachedSession
-
-            if isinstance(self._session, CachedSession):
-                return await self._session.cache.clear()
-        except ImportError:
-            pass
+        if CACHING_ENABLED and isinstance(self._session, CachedSession):
+            return await self._session.cache.clear()
 
     async def __aenter__(self) -> HttpClient:
         await self._session.__aenter__()
