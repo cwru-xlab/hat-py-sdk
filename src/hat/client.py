@@ -147,7 +147,7 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     @ensure_iterable
     async def put(self, models: Models) -> list[M]:
         data, mtypes = self._prepare_put(models)
-        return await self._data_request("PUT", data=data, mytpes=mtypes)
+        return await self._data_request("PUT", data=data, mtypes=mtypes)
 
     @ensure_iterable
     async def delete(self, record_ids: StringLike | IStringLike) -> None:
