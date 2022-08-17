@@ -23,7 +23,6 @@ orjson = { optional = true, version = "^3.7.12" }
 pydantic = { extras = ["dotenv"], version = "^1.9.1" }
 python-ulid = "^1.1.0"
 
-
 [tool.poetry.extras]
 fast = ["orjson"]
 
@@ -42,6 +41,19 @@ typeguard = "^2.13.3"
 safety = "^2.1.1"
 darglint = "^1.8.1"
 pyupgrade = "^2.37.3"
+coverage = { extras = ["toml"], version = "^6.4.4" }
+
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+tests = ["tests", "*/tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["hat", "tests"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 0
 
 [tool.isort]
 profile = "black"
