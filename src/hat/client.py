@@ -9,7 +9,6 @@ from contextlib import AbstractAsyncContextManager
 from contextlib import AbstractContextManager
 from typing import Callable
 from typing import Collection
-from typing import Generator
 from typing import Iterable
 from typing import Iterator
 from typing import Union
@@ -173,7 +172,7 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
         string = next(require_endpoint([string]))
         return string if isinstance(string, str) else string.endpoint
 
-    def _prepare_post(self, models: Iterable[M]) -> Generator[tuple]:
+    def _prepare_post(self, models: Iterable[M]) -> Iterable[tuple]:
         formatted = []
         for m in require_endpoint(models):
             # The namespace is added when constructing the endpoint URL,
