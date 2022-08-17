@@ -37,12 +37,11 @@ class BaseActiveHatModel(HatModel, abc.ABC):
     def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[M]:
         pass
 
-    @classmethod
-    def _client(cls) -> AsyncHatClient:
-        return cls.client  # ClassVar interferes with type checking.
-
 
 class AsyncActiveHatModel(BaseActiveHatModel):
+    def __init__(self, __wrapped: ActiveHatModel | None = None, **data: Any):
+        super().__init__(**(data if __wrapped is None else __wrapped.dict()))
+
     async def save(self, endpoint: str | None = None) -> A:
         if endpoint is not None:
             self.endpoint = endpoint
@@ -68,25 +67,34 @@ class AsyncActiveHatModel(BaseActiveHatModel):
     async def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[A]:
         return await cls._client().get(endpoint, cls, options)
 
+    def to_sync(self) -> S:
+        return ActiveHatModel(self)
+
+    @classmethod
+    def _client(cls) -> AsyncHatClient:
+        return cls.client  # ClassVar interferes with type checking.
+
 
 class ActiveHatModel(BaseActiveHatModel):
-    def __init__(self, **data: Any):
-        super().__init__(**data)
-        self._wrapped = AsyncActiveHatModel(**data)
+    def __init__(self, __wrapped: AsyncActiveHatModel | None = None, **data: Any):
+        super().__init__(**(data if __wrapped is None else __wrapped.dict()))
 
     def save(self, endpoint: str | None = None) -> S:
-        return sync.async_to_sync(self._wrapped.save)(endpoint)
+        return sync.async_to_sync(AsyncActiveHatModel.save)(self, endpoint)
 
     def delete(self) -> None:
-        return sync.async_to_sync(self._wrapped.delete)()
+        return sync.async_to_sync(AsyncActiveHatModel.delete)(self)
 
     @classmethod
     def delete_all(cls, record_ids: StringLike | IStringLike) -> None:
-        return sync.async_to_sync(cls._client().delete)(record_ids)
+        return sync.async_to_sync(AsyncActiveHatModel.delete_all)(record_ids)
 
     @classmethod
     def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[S]:
-        return sync.async_to_sync(cls._client().get)(endpoint, cls, options)
+        return sync.async_to_sync(AsyncActiveHatModel.get)(endpoint, cls, options)
+
+    def to_async(self) -> A:
+        return AsyncActiveHatModel(self)
 
 
 A = TypeVar("A", bound=AsyncActiveHatModel)
