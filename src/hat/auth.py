@@ -106,12 +106,12 @@ class ApiToken(abc.ABC):
     async def pk(self) -> str:
         if self._pk is None:
             url = urls.domain_public_key(await self.domain())
-            self._pk = await self._client.request("GET", url, self._auth)
+            self._pk = await self._client.request("GET", url, auth=self._auth)
         return self._pk
 
     async def value(self) -> str:
         if self._value is None or self.expired:
-            token = await self._client.request("GET", await self.url(), self._auth)
+            token = await self._client.request("GET", await self.url(), auth=self._auth)
             await self.set_value(token)
         return self._value
 

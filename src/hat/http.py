@@ -87,6 +87,7 @@ class HttpClient(AbstractAsyncContextManager):
         self,
         method: str,
         url: str,
+        *,
         auth: _auth.HttpAuth | None = None,
         headers: Mapping[str, str] | None = None,
         data: Any = None,
