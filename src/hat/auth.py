@@ -105,7 +105,7 @@ class ApiToken(abc.ABC):
 
     async def pk(self) -> str:
         if self._pk is None:
-            url = urls.domain_public_key(await self.domain())
+            url = urls.domain_pk(await self.domain())
             self._pk = await self._client.request("GET", url, auth=self._auth)
         return self._pk
 

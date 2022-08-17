@@ -15,11 +15,11 @@ def hat_domain(username: str) -> str:
     return with_scheme(f"{username}.hubat.net")
 
 
-def username_public_key(username: str) -> str:
-    return domain_public_key(hat_domain(username))
+def username_pk(username: str) -> str:
+    return domain_pk(hat_domain(username))
 
 
-def domain_public_key(domain: str) -> str:
+def domain_pk(domain: str) -> str:
     return with_scheme(f"{domain}/publickey")
 
 
@@ -91,7 +91,7 @@ API_VERSION = "v2.6"
 SCHEME = "https"
 
 SCHEME_PATTERN = re.compile(r"^(?:http|https):/+")
-PK_PATTERN = no_scheme(username_public_key(r"\w+"))
+PK_PATTERN = no_scheme(username_pk(r"\w+"))
 OWNER_TOKEN_PATTERN = no_scheme(username_owner_token(r"\w+"))
 APP_TOKEN_PATTERN = no_scheme(username_app_token(r"\w+", r"\w+"))
 ENDPOINT_PATTERN = no_scheme(username_endpoint(r"\w+", r"\w+", r"\w+"))
