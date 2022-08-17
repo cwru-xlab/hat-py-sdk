@@ -19,8 +19,10 @@ from . import urls
 from . import utils
 from .auth import ApiToken
 from .auth import TokenAuth
-from .http import AsyncCachable
-from .http import Cachable
+from .http import AsyncCacheable
+from .http import AsyncCloseable
+from .http import Cacheable
+from .http import Closeable
 from .http import HttpClient
 from .model import GetOpts
 from .model import HatModel
@@ -110,7 +112,9 @@ class BaseHatClient(abc.ABC):
         return utils.to_str(self, token=self.token, namespace=self.namespace)
 
 
-class AsyncHatClient(BaseHatClient, AsyncCachable, AbstractAsyncContextManager):
+class AsyncHatClient(
+    BaseHatClient, AsyncCacheable, AsyncCloseable, AbstractAsyncContextManager
+):
     __slots__ = "_client", "_auth", "_token", "_namespace", "_pattern"
 
     def __init__(
@@ -223,6 +227,9 @@ class AsyncHatClient(BaseHatClient, AsyncCachable, AbstractAsyncContextManager):
     async def clear_cache(self) -> None:
         return await self._client.clear_cache()
 
+    async def close(self) -> None:
+        return await self._client.close()
+
     async def __aenter__(self) -> AsyncHatClient:
         await self._client.__aenter__()
         return self
@@ -231,7 +238,7 @@ class AsyncHatClient(BaseHatClient, AsyncCachable, AbstractAsyncContextManager):
         return await self._client.__aexit__(*args)
 
 
-class HatClient(BaseHatClient, Cachable, AbstractContextManager):
+class HatClient(BaseHatClient, Cacheable, Closeable, AbstractContextManager):
     __slots__ = "_wrapped"
 
     def __init__(self, wrapped: AsyncHatClient):
@@ -267,6 +274,9 @@ class HatClient(BaseHatClient, Cachable, AbstractContextManager):
 
     def clear_cache(self) -> None:
         return sync.async_to_sync(self._wrapped.clear_cache)()
+
+    def close(self) -> None:
+        return sync.async_to_sync(self._wrapped.close)()
 
     def __enter__(self) -> HatClient:
         sync.async_to_sync(self._wrapped.__aenter__)()
