@@ -117,7 +117,6 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
         token: ApiToken,
         namespace: str | None = None,
     ) -> None:
-        super().__init__(namespace)
         self._client = client
         self._token = token
         self._auth = TokenAuth(token)
@@ -180,8 +179,8 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     def _prepare_post(self, models: Iterable[M]) -> Iterable[tuple]:
         formatted = []
         for m in require_endpoint(models):
-            # The namespace is added when constructing the endpoint URL,
-            # so it should not be a part of the endpoint here.
+            # The namespace is added when constructing the endpoint URL, so it should
+            # not be a part of the endpoint here.
             if self._pattern.match(m.endpoint):
                 m.endpoint = self._pattern.split(m.endpoint)[-1]
             formatted.append(m)
@@ -192,9 +191,9 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     def _prepare_put(self, models: Iterable[M]) -> tuple[str, Iterable[type]]:
         formatted = []
         for m in require_endpoint(models):
-            # The endpoint should include the namespace. HatRecords created
-            # from responses will include the namespace. This is just a
-            # convenience if wanting to create HatRecords manually.
+            # The endpoint should include the namespace. BaseHatModels created from
+            # responses will include the namespace. This is just a convenience if
+            # wanting to create them manually.
             if self._pattern.match(m.endpoint) is None:
                 m.endpoint = f"{self._namespace}/{m.endpoint}"
             formatted.append(m)
@@ -233,27 +232,22 @@ class HatClient(BaseHatClient, AbstractContextManager):
     def __init__(self, wrapped: AsyncHatClient):
         self._wrapped = wrapped
 
-    @requires_namespace
     def get(
         self,
         endpoint: StringLike,
         mtype: type[M] = HatModel,
         options: GetOpts | None = None,
     ) -> list[M]:
-        return sync.async_to_sync(self._wrapped)(endpoint, mtype, options)
+        return sync.async_to_sync(self._wrapped.get)(endpoint, mtype, options)
 
-    @ensure_iterable
-    @requires_namespace
     def post(self, models: Models) -> list[M]:
-        return sync.async_to_sync(self._wrapped)(models)
+        return sync.async_to_sync(self._wrapped.post)(models)
 
-    @ensure_iterable
     def put(self, models: Models) -> list[M]:
-        return sync.async_to_sync(self._wrapped)(models)
+        return sync.async_to_sync(self._wrapped.put)(models)
 
-    @ensure_iterable
     def delete(self, record_ids: StringLike | IStringLike) -> None:
-        return sync.async_to_sync(self._wrapped)(record_ids)
+        return sync.async_to_sync(self._wrapped.delete)(record_ids)
 
     def to_async(self) -> AsyncHatClient:
         return self._wrapped
