@@ -11,7 +11,6 @@ from .auth import JwtOwnerToken
 from .auth import JwtToken
 from .auth import TokenAuth
 from .auth import WebOwnerToken
-from .base import HatConfig
 from .client import AsyncHatClient
 from .client import HatClient
 from .errors import AuthError
@@ -30,6 +29,7 @@ from .errors import WrongCredentialsError
 from .errors import WrongTokenError
 from .http import HttpClient
 from .model import GetOpts
+from .model import HatConfig
 from .model import HatModel
 from .model import M
 from .model import Ordering
