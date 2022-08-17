@@ -43,6 +43,18 @@ SESSION_DEFAULTS = {
 }
 
 
+class Cachable:
+    __slots__ = ()
+
+    def clear_cache(self) -> None:
+        pass
+
+
+class AsyncCachable(Cachable):
+    async def clear_cache(self) -> None:
+        pass
+
+
 class ResponseHandler:
     @staticmethod
     async def on_success(response: ClientResponse, **kwargs) -> str | list[M] | None:
@@ -73,7 +85,7 @@ class ResponseHandler:
             raise error
 
 
-class HttpClient(AbstractAsyncContextManager):
+class HttpClient(AsyncCachable, AbstractAsyncContextManager):
     __slots__ = "_session", "_handler", "_auth"
 
     def __init__(

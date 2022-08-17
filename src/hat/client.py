@@ -19,6 +19,8 @@ from . import urls
 from . import utils
 from .auth import ApiToken
 from .auth import TokenAuth
+from .http import AsyncCachable
+from .http import Cachable
 from .http import HttpClient
 from .model import GetOpts
 from .model import HatModel
@@ -108,7 +110,7 @@ class BaseHatClient(abc.ABC):
         return utils.to_str(self, token=self.token, namespace=self.namespace)
 
 
-class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
+class AsyncHatClient(BaseHatClient, AsyncCachable, AbstractAsyncContextManager):
     __slots__ = "_client", "_auth", "_token", "_namespace", "_pattern"
 
     def __init__(
@@ -218,6 +220,9 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
     def to_sync(self) -> HatClient:
         return HatClient(self)
 
+    async def clear_cache(self) -> None:
+        return await self._client.clear_cache()
+
     async def __aenter__(self) -> AsyncHatClient:
         await self._client.__aenter__()
         return self
@@ -226,7 +231,7 @@ class AsyncHatClient(BaseHatClient, AbstractAsyncContextManager):
         return await self._client.__aexit__(*args)
 
 
-class HatClient(BaseHatClient, AbstractContextManager):
+class HatClient(BaseHatClient, Cachable, AbstractContextManager):
     __slots__ = "_wrapped"
 
     def __init__(self, wrapped: AsyncHatClient):
@@ -259,6 +264,9 @@ class HatClient(BaseHatClient, AbstractContextManager):
     @property
     def namespace(self) -> str | None:
         return self._wrapped.namespace
+
+    def clear_cache(self) -> None:
+        return sync.async_to_sync(self._wrapped.clear_cache)()
 
     def __enter__(self) -> HatClient:
         sync.async_to_sync(self._wrapped.__aenter__)()
