@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-from typing import Any
 from typing import ClassVar
 from typing import TypeVar
 
@@ -39,9 +38,6 @@ class BaseActiveHatModel(HatModel, abc.ABC):
 
 
 class AsyncActiveHatModel(BaseActiveHatModel):
-    def __init__(self, __wrapped: ActiveHatModel | None = None, **data: Any):
-        super().__init__(**(data if __wrapped is None else __wrapped.dict()))
-
     async def save(self, endpoint: str | None = None) -> A:
         if endpoint is not None:
             self.endpoint = endpoint
@@ -67,8 +63,8 @@ class AsyncActiveHatModel(BaseActiveHatModel):
     async def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[A]:
         return await cls._client().get(endpoint, cls, options)
 
-    def to_sync(self) -> S:
-        return ActiveHatModel(self)
+    def to_sync(self) -> ActiveHatModel:
+        return ActiveHatModel.parse_obj(self)
 
     @classmethod
     def _client(cls) -> AsyncHatClient:
@@ -76,9 +72,6 @@ class AsyncActiveHatModel(BaseActiveHatModel):
 
 
 class ActiveHatModel(BaseActiveHatModel):
-    def __init__(self, __wrapped: AsyncActiveHatModel | None = None, **data: Any):
-        super().__init__(**(data if __wrapped is None else __wrapped.dict()))
-
     def save(self, endpoint: str | None = None) -> S:
         return sync.async_to_sync(AsyncActiveHatModel.save)(self, endpoint)
 
@@ -93,8 +86,8 @@ class ActiveHatModel(BaseActiveHatModel):
     def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[S]:
         return sync.async_to_sync(AsyncActiveHatModel.get)(endpoint, cls, options)
 
-    def to_async(self) -> A:
-        return AsyncActiveHatModel(self)
+    def to_async(self) -> AsyncActiveHatModel:
+        return AsyncActiveHatModel.parse_obj(self)
 
 
 A = TypeVar("A", bound=AsyncActiveHatModel)

@@ -9,37 +9,16 @@ from typing import Iterable
 from typing import TypeVar
 
 import pydantic
-from humps import camel
-from pydantic import BaseConfig
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic import NonNegativeInt
-from pydantic import StrictStr
 from pydantic import conint
 from pydantic import constr
 from pydantic.generics import GenericModel
 
 from . import utils
-
-
-class HatConfig(BaseConfig):
-    allow_population_by_field_name = True
-    use_enum_values = True
-    json_dumps = utils.dumps
-    json_loads = utils.loads
-    underscore_attrs_are_private = True
-
-
-class ApiConfig(HatConfig):
-    alias_generator = camel.case
-    allow_mutation = False
-
-
-class BaseHatModel(BaseModel, ABC):
-    endpoint: StrictStr | None
-    record_id: StrictStr | None
-
-    Config = HatConfig
+from .base import ApiConfig
+from .base import BaseHatModel
 
 
 class BaseApiModel(BaseModel, ABC):

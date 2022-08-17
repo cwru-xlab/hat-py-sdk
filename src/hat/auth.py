@@ -17,8 +17,8 @@ from pydantic import constr
 from . import errors
 from . import urls
 from . import utils
+from .base import ApiConfig
 from .http import HttpClient
-from .model import ApiConfig
 
 
 JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
