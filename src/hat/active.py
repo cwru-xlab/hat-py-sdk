@@ -91,5 +91,9 @@ class ActiveHatModel(BaseActiveHatModel):
         return AsyncActiveHatModel.parse_obj(self)
 
 
+def set_client(client: AsyncHatClient) -> None:
+    AsyncActiveHatModel.client = client
+
+
 A = TypeVar("A", bound=AsyncActiveHatModel)
 S = TypeVar("S", bound=ActiveHatModel)
