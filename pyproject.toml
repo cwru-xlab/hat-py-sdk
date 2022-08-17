@@ -14,11 +14,11 @@ packages = [{ include = "hat", from = "src" }]
 python = "^3.7"
 
 PyJWT = { extras = ["crypto"], version = "^2.4.0" }
-aiodns = "^3.0.0"
+aiodns = { optional = true, version = "^3.0.0" }
 aiohttp = "^3.8.1"
 aiohttp-client-cache = { optional = true, version = "^0.7.3" }
 asgiref = "^3.5.2"
-cchardet = "^2.1.7"
+cchardet = { optional = true, version = "^2.1.7" }
 humps = "^0.2.2"
 keyring = "^23.8.2"
 orjson = { optional = true, version = "^3.7.12" }
