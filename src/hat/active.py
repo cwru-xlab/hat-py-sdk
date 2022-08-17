@@ -84,7 +84,8 @@ class ActiveHatModel(BaseActiveHatModel):
 
     @classmethod
     def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[S]:
-        return sync.async_to_sync(AsyncActiveHatModel.get)(endpoint, cls, options)
+        models = sync.async_to_sync(AsyncActiveHatModel.get)(endpoint, options)
+        return [ActiveHatModel.parse_obj(m) for m in models]
 
     def to_async(self) -> AsyncActiveHatModel:
         return AsyncActiveHatModel.parse_obj(self)
