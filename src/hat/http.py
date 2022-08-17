@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import inspect
 import mimetypes
 import pprint
 from contextlib import AbstractAsyncContextManager
@@ -10,8 +11,15 @@ from typing import Mapping
 from aiohttp import ClientResponse
 from aiohttp import ClientResponseError
 from aiohttp import ClientSession
-from aiohttp_client_cache import CacheBackend
-from aiohttp_client_cache import CachedSession
+
+
+try:
+    from aiohttp_client_cache import CacheBackend
+    from aiohttp_client_cache import CachedSession
+
+    CACHING_ENABLED = True
+except ImportError:
+    CACHING_ENABLED = False
 
 from . import auth as _auth
 from . import errors
@@ -79,9 +87,15 @@ class HttpClient(AbstractAsyncContextManager):
 
     @staticmethod
     def _new_session(**kwargs) -> ClientSession:
-        kwargs = SESSION_DEFAULTS | kwargs
-        cache = kwargs.pop("cache", None) or CacheBackend(**kwargs)
-        return CachedSession(cache=cache, **kwargs)
+        if CACHING_ENABLED:
+            kwargs = SESSION_DEFAULTS | kwargs
+            cache = kwargs.pop("cache", None) or CacheBackend(**kwargs)
+            session = CachedSession(cache=cache, **kwargs)
+        else:
+            params = inspect.signature(ClientSession.__init__).parameters
+            kwargs = {k: v for k, v in kwargs.items() if k in params}
+            session = ClientSession(**kwargs)
+        return session
 
     async def request(
         self,
@@ -113,8 +127,13 @@ class HttpClient(AbstractAsyncContextManager):
         return await self._session.close()
 
     async def clear_cache(self) -> None:
-        if isinstance(self._session, CachedSession):
-            return await self._session.cache.clear()
+        try:
+            from aiohttp_client_cache import CachedSession
+
+            if isinstance(self._session, CachedSession):
+                return await self._session.cache.clear()
+        except ImportError:
+            pass
 
     async def __aenter__(self) -> HttpClient:
         await self._session.__aenter__()

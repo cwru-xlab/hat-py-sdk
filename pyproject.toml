@@ -14,17 +14,19 @@ packages = [{ include = "hat", from = "src" }]
 python = "^3.7"
 
 aiohttp = { extras = ["speedups"], version = "^3.8.1" }
-aiohttp-client-cache = "^0.7.3"
+aiohttp-client-cache = { optional = true, version = "^0.7.3" }
 asgiref = "^3.5.2"
 humps = "^0.2.2"
 keyring = "^23.8.2"
 orjson = { optional = true, version = "^3.7.12" }
 pydantic = { extras = ["dotenv"], version = "^1.9.1" }
 PyJWT = { extras = ["crypto"], version = "^2.4.0" }
-python-ulid = "^1.1.0"
+python-ulid = { optional = true, version = "^1.1.0" }
 
 [tool.poetry.extras]
-fast = ["orjson"]
+all = ["aiohttp-client-cache", "orjson", "python-ulid"]
+fast = ["aiohttp-client-cache", "orjson"]
+ulid = ["python-ulid"]
 
 [tool.poetry.dev-dependencies]
 black = "^22.6.0"

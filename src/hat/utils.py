@@ -23,6 +23,19 @@ finally:
         return json.loads(obj, **kwargs)
 
 
+try:
+    import ulid as unique
+
+    def uid() -> str:
+        return str(unique.ULID())
+
+except ImportError:
+    import uuid as unique
+
+    def uid() -> str:
+        return str(unique.uuid4())
+
+
 def to_str(self: Any, **attrs) -> str:
     name = type(self).__name__
     attrs = ", ".join(f"{name}={value}" for name, value in attrs.items())

@@ -9,7 +9,6 @@ from typing import Iterable
 from typing import TypeVar
 
 import pydantic
-import ulid
 from humps import camel
 from pydantic import BaseConfig
 from pydantic import BaseModel
@@ -54,7 +53,7 @@ class BaseApiModel(BaseModel, ABC):
 
 
 class HatModel(BaseHatModel):
-    uid: str = Field(default_factory=lambda: str(ulid.ULID()))
+    uid: str = Field(default_factory=utils.uid)
 
     class Config:
         extra = pydantic.Extra.allow
