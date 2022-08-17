@@ -13,6 +13,7 @@ from aiohttp import ClientResponseError
 from aiohttp import ClientSession
 
 
+# Ref: https://adamj.eu/tech/2021/12/29/python-type-hints-optional-imports/
 try:
     from aiohttp_client_cache import CacheBackend
     from aiohttp_client_cache import CachedSession
@@ -87,8 +88,8 @@ class HttpClient(AbstractAsyncContextManager):
 
     @staticmethod
     def _new_session(**kwargs) -> ClientSession:
+        kwargs = SESSION_DEFAULTS | kwargs
         if CACHING_ENABLED:
-            kwargs = SESSION_DEFAULTS | kwargs
             cache = kwargs.pop("cache", None) or CacheBackend(**kwargs)
             session = CachedSession(cache=cache, **kwargs)
         else:
