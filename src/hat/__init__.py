@@ -1,6 +1,7 @@
 from .active import A
 from .active import ActiveHatModel
 from .active import AsyncActiveHatModel
+from .active import S
 from .auth import ApiToken
 from .auth import AppToken
 from .auth import CredentialAuth

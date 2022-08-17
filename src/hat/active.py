@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 from typing import Any
 from typing import ClassVar
 from typing import TypeVar
@@ -8,13 +9,37 @@ from asgiref import sync
 
 from . import errors
 from .client import AsyncHatClient
+from .client import BaseHatClient
 from .client import IStringLike
 from .client import StringLike
 from .model import GetOpts
 from .model import HatModel
+from .model import M
 
 
-class AsyncActiveHatModel(HatModel):
+class BaseActiveHatModel(HatModel, abc.ABC):
+    client: ClassVar[BaseHatClient]
+
+    @abc.abstractmethod
+    def save(self, endpoint: str | None = None) -> M:
+        pass
+
+    @abc.abstractmethod
+    def delete(self) -> None:
+        pass
+
+    @classmethod
+    @abc.abstractmethod
+    def delete_all(cls, record_ids: StringLike | IStringLike) -> None:
+        pass
+
+    @classmethod
+    @abc.abstractmethod
+    def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[M]:
+        pass
+
+
+class AsyncActiveHatModel(BaseActiveHatModel):
     client: ClassVar[AsyncHatClient]
 
     async def save(self, endpoint: str | None = None) -> A:
@@ -48,7 +73,7 @@ class AsyncActiveHatModel(HatModel):
         return cls.client
 
 
-class ActiveHatModel(HatModel):
+class ActiveHatModel(BaseActiveHatModel):
     client: ClassVar[AsyncHatClient]
 
     def __init__(self, **data: Any):
