@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hat-py-sdk"
-version = "0.25.7"
+version = "0.25.8"
 description = ""
 authors = ["rtatton <rdt17@proton.me>"]
 license = "MIT"
