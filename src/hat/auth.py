@@ -79,7 +79,7 @@ class JwtAppToken(JwtToken):
 
 class ApiToken(abc.ABC):
     __slots__ = (
-        "_client",
+        "_http",
         "_auth",
         "_jwt_type",
         "_value",
@@ -91,9 +91,9 @@ class ApiToken(abc.ABC):
     )
 
     def __init__(
-        self, client: HttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
+        self, http_client: HttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
     ) -> None:
-        self._client = client
+        self._http = http_client
         self._auth = auth
         self._jwt_type = jwt_type
         self._value: str | None = None
@@ -106,12 +106,12 @@ class ApiToken(abc.ABC):
     async def pk(self) -> str:
         if self._pk is None:
             url = urls.domain_pk(await self.domain())
-            self._pk = await self._client.request("GET", url, auth=self._auth)
+            self._pk = await self._http.request("GET", url, auth=self._auth)
         return self._pk
 
     async def value(self) -> str:
         if self._value is None or self.expired:
-            token = await self._client.request("GET", await self.url(), auth=self._auth)
+            token = await self._http.request("GET", await self.url(), auth=self._auth)
             await self.set_value(token)
         return self._value
 
@@ -154,11 +154,11 @@ class ApiToken(abc.ABC):
 class CredentialOwnerToken(ApiToken):
     __slots__ = "_url"
 
-    def __init__(self, client: HttpClient, credential: Credential) -> None:
-        super().__init__(client, CredentialAuth(credential), JwtOwnerToken)
+    def __init__(self, http_client: HttpClient, credential: Credential) -> None:
+        super().__init__(http_client, CredentialAuth(credential), JwtOwnerToken)
         self._url = urls.username_owner_token(credential.username)
 
-    def url(self) -> str:
+    async def url(self) -> str:
         return self._url
 
 
