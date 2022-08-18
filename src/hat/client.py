@@ -115,15 +115,15 @@ class BaseHatClient(abc.ABC):
 class AsyncHatClient(
     BaseHatClient, AsyncCacheable, AsyncCloseable, AbstractAsyncContextManager
 ):
-    __slots__ = "_client", "_auth", "_token", "_namespace", "_pattern"
+    __slots__ = "_http", "_auth", "_token", "_namespace", "_pattern"
 
     def __init__(
         self,
-        client: HttpClient,
+        http_client: HttpClient,
         token: ApiToken,
         namespace: str | None = None,
     ) -> None:
-        self._client = client
+        self._http = http_client
         self._token = token
         self._auth = TokenAuth(token)
         self._namespace = namespace
@@ -175,7 +175,7 @@ class AsyncHatClient(
         return await self._request(method, url, **kwargs)
 
     async def _request(self, method: str, url: str, **kwargs) -> list[M] | None:
-        return await self._client.request(method, url, auth=self._auth, **kwargs)
+        return await self._http.request(method, url, auth=self._auth, **kwargs)
 
     @staticmethod
     def _prepare_get(string: StringLike) -> str:
@@ -225,17 +225,17 @@ class AsyncHatClient(
         return HatClient(self)
 
     async def clear_cache(self) -> None:
-        return await self._client.clear_cache()
+        return await self._http.clear_cache()
 
     async def close(self) -> None:
-        return await self._client.close()
+        return await self._http.close()
 
     async def __aenter__(self) -> AsyncHatClient:
-        await self._client.__aenter__()
+        await self._http.__aenter__()
         return self
 
     async def __aexit__(self, *args) -> None:
-        return await self._client.__aexit__(*args)
+        return await self._http.__aexit__(*args)
 
 
 class HatClient(BaseHatClient, Cacheable, Closeable, AbstractContextManager):
