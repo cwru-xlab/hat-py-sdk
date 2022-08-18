@@ -105,13 +105,15 @@ class ApiToken(abc.ABC):
 
     async def pk(self) -> str:
         if self._pk is None:
-            url = urls.domain_pk(await self.domain())
-            self._pk = await self._http.request("GET", url, auth=self._auth)
+            domain = await self.domain()
+            url = urls.domain_pk(domain)
+            self._pk = await self._get(url)
         return self._pk
 
     async def value(self) -> str:
         if self._value is None or self.expired:
-            token = await self._http.request("GET", await self.url(), auth=self._auth)
+            url = await self.url()
+            token = await self._get(url)
             await self.set_value(token)
         return self._value
 
@@ -139,6 +141,9 @@ class ApiToken(abc.ABC):
     @property
     def expired(self) -> bool:
         return self._expires <= datetime.datetime.utcnow()
+
+    async def _get(self, url: str) -> str:
+        return await self._http.request("GET", url, auth=self._auth)
 
     def _compute_expiration(self) -> datetime.datetime:
         iat = datetime.datetime.utcfromtimestamp(float(self._decoded.iat))
@@ -182,7 +187,8 @@ class AppToken(ApiToken):
 
     async def url(self) -> str:
         if self._url is None:
-            self._url = urls.domain_app_token(await self.domain(), self._app_id)
+            domain = await self.domain()
+            self._url = urls.domain_app_token(domain, self._app_id)
         return self._url
 
 
