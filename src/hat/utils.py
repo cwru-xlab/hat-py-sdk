@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 from typing import AnyStr
+from typing import Callable
 
 from asgiref import sync
 
 
+Synchronizer = Callable[[Callable], Callable]
+
 synchronize = sync.async_to_sync
 
 
-def set_synchronizer(synchronizer: sync.AsyncToSync) -> None:
+def set_synchronizer(synchronizer: Synchronizer) -> None:
     global synchronize
     synchronize = synchronizer
 
