@@ -3,6 +3,16 @@ from __future__ import annotations
 from typing import Any
 from typing import AnyStr
 
+from asgiref import sync
+
+
+synchronize = sync.async_to_sync
+
+
+def set_synchronizer(synchronizer: sync.AsyncToSync) -> None:
+    global synchronize
+    synchronize = synchronizer
+
 
 try:
     import orjson as json

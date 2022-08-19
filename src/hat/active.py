@@ -4,9 +4,8 @@ import abc
 from typing import ClassVar
 from typing import TypeVar
 
-from asgiref import sync
-
 from . import errors
+from . import utils
 from .client import AsyncHatClient
 from .client import IStringLike
 from .client import StringLike
@@ -73,18 +72,18 @@ class AsyncActiveHatModel(BaseActiveHatModel):
 
 class ActiveHatModel(BaseActiveHatModel):
     def save(self, endpoint: str | None = None) -> S:
-        return sync.async_to_sync(AsyncActiveHatModel.save)(self, endpoint)
+        return utils.synchronize(AsyncActiveHatModel.save)(self, endpoint)
 
     def delete(self) -> None:
-        return sync.async_to_sync(AsyncActiveHatModel.delete)(self)
+        return utils.synchronize(AsyncActiveHatModel.delete)(self)
 
     @classmethod
     def delete_all(cls, record_ids: StringLike | IStringLike) -> None:
-        return sync.async_to_sync(AsyncActiveHatModel.delete_all)(record_ids)
+        return utils.synchronize(AsyncActiveHatModel.delete_all)(record_ids)
 
     @classmethod
     def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[S]:
-        models = sync.async_to_sync(AsyncActiveHatModel.get)(endpoint, options)
+        models = utils.synchronize(AsyncActiveHatModel.get)(endpoint, options)
         return [ActiveHatModel.parse_obj(m) for m in models]
 
     def to_async(self) -> AsyncActiveHatModel:

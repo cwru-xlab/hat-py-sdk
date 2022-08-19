@@ -13,8 +13,6 @@ from typing import Iterable
 from typing import Iterator
 from typing import Union
 
-from asgiref import sync
-
 from . import urls
 from . import utils
 from .auth import ApiToken
@@ -250,16 +248,16 @@ class HatClient(BaseHatClient, Cacheable, Closeable, AbstractContextManager):
         mtype: type[M] = HatModel,
         options: GetOpts | None = None,
     ) -> list[M]:
-        return sync.async_to_sync(self._wrapped.get)(endpoint, mtype, options)
+        return utils.synchronize(self._wrapped.get)(endpoint, mtype, options)
 
     def post(self, models: Models) -> list[M]:
-        return sync.async_to_sync(self._wrapped.post)(models)
+        return utils.synchronize(self._wrapped.post)(models)
 
     def put(self, models: Models) -> list[M]:
-        return sync.async_to_sync(self._wrapped.put)(models)
+        return utils.synchronize(self._wrapped.put)(models)
 
     def delete(self, record_ids: StringLike | IStringLike) -> None:
-        return sync.async_to_sync(self._wrapped.delete)(record_ids)
+        return utils.synchronize(self._wrapped.delete)(record_ids)
 
     def to_async(self) -> AsyncHatClient:
         return self._wrapped
@@ -273,14 +271,14 @@ class HatClient(BaseHatClient, Cacheable, Closeable, AbstractContextManager):
         return self._wrapped.namespace
 
     def clear_cache(self) -> None:
-        return sync.async_to_sync(self._wrapped.clear_cache)()
+        return utils.synchronize(self._wrapped.clear_cache)()
 
     def close(self) -> None:
-        return sync.async_to_sync(self._wrapped.close)()
+        return utils.synchronize(self._wrapped.close)()
 
     def __enter__(self) -> HatClient:
-        sync.async_to_sync(self._wrapped.__aenter__)()
+        utils.synchronize(self._wrapped.__aenter__)()
         return self
 
     def __exit__(self, *args) -> None:
-        return sync.async_to_sync(self._wrapped.__aexit__)(*args)
+        return utils.synchronize(self._wrapped.__aexit__)(*args)
