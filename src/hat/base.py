@@ -260,7 +260,7 @@ class TokenAuth(HttpAuth):
         self._token = token
 
     def headers(self) -> dict[str, str]:
-        return {TOKEN_HEADER: self._token.value()}
+        return {TOKEN_HEADER: self._token.value}
 
     def on_response(self, response: BaseResponse) -> None:
         if TOKEN_HEADER in response.headers:
@@ -274,7 +274,7 @@ class AsyncTokenAuth(AsyncHttpAuth):
         self._token = token
 
     async def headers(self) -> dict[str, str]:
-        return {TOKEN_HEADER: await self._token.value()}
+        return {TOKEN_HEADER: await self._token.value}
 
     async def on_response(self, response: BaseResponse) -> None:
         if TOKEN_HEADER in response.headers:
@@ -480,14 +480,14 @@ class BaseHatClient(Cacheable, abc.ABC):
 class BaseActiveHatModel(HatModel, abc.ABC):
     client: ClassVar[BaseHatClient]
 
-    def save(self, endpoint: str | None = None) -> A | Awaitable[A] | None:
+    def save(self, endpoint: str | None = None) -> A | Awaitable[A]:
         if endpoint is not None:
             self.endpoint = endpoint
         has_id = self.record_id is not None
         try_first = self._client().put if has_id else self._client().post
         return self._save(try_first, has_id)
 
-    def _save(self, try_first: Callable, has_id: bool) -> A | Awaitable[A] | None:
+    def _save(self, try_first: Callable, has_id: bool) -> A | Awaitable[A]:
         try:
             saved = try_first(self)
         except errors.PutError as error:

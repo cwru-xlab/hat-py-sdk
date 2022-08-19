@@ -27,6 +27,7 @@ from .base import IStringLike
 from .base import Models
 from .base import StringLike
 from .base import TokenAuth
+from .base import ensure_iterable
 from .base import requires_namespace
 from .model import GetOpts
 from .model import HatModel
@@ -183,12 +184,16 @@ class HatClient(BaseHatClient, Cacheable, Closeable, AbstractContextManager):
     ) -> list[M]:
         return super().get(endpoint, mtype, options)
 
+    @ensure_iterable
+    @requires_namespace
     def post(self, models: Models) -> list[M]:
         return super().post(models)
 
+    @ensure_iterable
     def put(self, models: Models) -> list[M]:
         return super().put(models)
 
+    @ensure_iterable
     def delete(self, record_ids: StringLike | IStringLike) -> None:
         return super().delete(record_ids)
 
@@ -218,13 +223,13 @@ class HatClient(BaseHatClient, Cacheable, Closeable, AbstractContextManager):
         return self._request(method, url, **kwargs)
 
     def _request(self, method: str, url: str, **kwargs) -> list[M] | None:
-        return await self._client.request(method, url, auth=self._auth, **kwargs)
+        return self._client.request(method, url, auth=self._auth, **kwargs)
 
 
 class ActiveHatModel(BaseActiveHatModel):
     client: ClassVar[HatClient]
 
-    def _save(self, try_first: Callable, has_id: bool) -> A | None:
+    def _save(self, try_first: Callable, has_id: bool) -> A:
         return super()._save(try_first, has_id)
 
     @classmethod
