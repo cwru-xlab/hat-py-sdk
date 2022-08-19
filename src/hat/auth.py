@@ -4,7 +4,6 @@ import abc
 import datetime
 import mimetypes
 import re
-from typing import Any
 
 import jwt
 from aiohttp import ClientResponse
@@ -14,10 +13,11 @@ from pydantic import PositiveInt
 from pydantic import StrictStr
 from pydantic import constr
 
+from . import AsyncHttpClient
 from . import errors
 from . import urls
 from . import utils
-from .http import HttpClient
+from .base import HttpAuth
 from .model import ApiConfig
 
 
@@ -91,7 +91,7 @@ class ApiToken(abc.ABC):
     )
 
     def __init__(
-        self, http_client: HttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
+        self, http_client: AsyncHttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
     ) -> None:
         self._http = http_client
         self._auth = auth
@@ -159,8 +159,8 @@ class ApiToken(abc.ABC):
 class CredentialOwnerToken(ApiToken):
     __slots__ = "_url"
 
-    def __init__(self, http_client: HttpClient, credential: Credential) -> None:
-        super().__init__(http_client, CredentialAuth(credential), JwtOwnerToken)
+    def __init__(self, http_client: AsyncHttpClient, credential: Credential) -> None:
+        super().__init__(http_client, AsyncCredentialAuth(credential), JwtOwnerToken)
         self._url = urls.username_owner_token(credential.username)
 
     async def url(self) -> str:
@@ -172,11 +172,11 @@ class AppToken(ApiToken):
 
     def __init__(
         self,
-        client: HttpClient,
+        client: AsyncHttpClient,
         owner_token: CredentialOwnerToken,
         app_id: str,
     ) -> None:
-        super().__init__(client, TokenAuth(owner_token), JwtAppToken)
+        super().__init__(client, AsyncTokenAuth(owner_token), JwtAppToken)
         self._owner_token = owner_token
         self._app_id = app_id
         self._url: str | None = None
@@ -196,17 +196,7 @@ class WebOwnerToken(ApiToken, abc.ABC):  # TODO
     pass
 
 
-class HttpAuth:
-    __slots__ = ()
-
-    async def headers(self) -> dict[str, str]:
-        return {}
-
-    async def on_response(self, response: Any) -> None:
-        pass
-
-
-class TokenAuth(HttpAuth):
+class AsyncTokenAuth(HttpAuth):
     __slots__ = "_token"
 
     def __init__(self, token: ApiToken):
@@ -220,7 +210,7 @@ class TokenAuth(HttpAuth):
             await self._token.set_value(response.headers[TOKEN_HEADER])
 
 
-class CredentialAuth(HttpAuth):
+class AsyncCredentialAuth(HttpAuth):
     __slots__ = ("_credential",)
 
     def __init__(self, credential: Credential):

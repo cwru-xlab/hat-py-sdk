@@ -17,13 +17,14 @@ PyJWT = { extras = ["crypto"], version = "^2.4.0" }
 aiodns = { optional = true, version = "^3.0.0" }
 aiohttp = "^3.8.1"
 aiohttp-client-cache = { optional = true, version = "^0.7.3" }
-asgiref = "^3.5.2"
 cchardet = { optional = true, version = "^2.1.7" }
 humps = "^0.2.2"
 keyring = "^23.8.2"
 orjson = { optional = true, version = "^3.7.12" }
 pydantic = "^1.9.1"
 python-ulid = { optional = true, version = "^1.1.0" }
+requests = "^2.28.1"
+requests-cache = "^0.9.5"
 
 [tool.poetry.extras]
 all = ["aiodns", "aiohttp-client-cache", "cchardet", "orjson", "python-ulid"]

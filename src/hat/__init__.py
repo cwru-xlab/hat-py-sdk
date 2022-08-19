@@ -1,19 +1,15 @@
-from .active import A
-from .active import ActiveHatModel
-from .active import AsyncActiveHatModel
-from .active import S
-from .active import set_client
+from .aioclient import set_async_client
 from .auth import ApiToken
 from .auth import AppToken
-from .auth import CredentialAuth
+from .auth import AsyncCredentialAuth
+from .auth import AsyncTokenAuth
 from .auth import CredentialOwnerToken
 from .auth import JwtAppToken
 from .auth import JwtOwnerToken
 from .auth import JwtToken
-from .auth import TokenAuth
 from .auth import WebOwnerToken
-from .client import AsyncHatClient
 from .client import HatClient
+from .client import set_client
 from .errors import AuthError
 from .errors import DeleteError
 from .errors import DuplicateDataError
@@ -28,10 +24,11 @@ from .errors import PutError
 from .errors import RecordNotFoundError
 from .errors import WrongCredentialsError
 from .errors import WrongTokenError
-from .http import HttpClient
 from .model import GetOpts
 from .model import HatConfig
 from .model import HatModel
 from .model import M
 from .model import Ordering
-from .utils import set_synchronizer
+
+
+# TODO
