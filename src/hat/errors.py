@@ -67,6 +67,10 @@ class LimitedTokenScopeError(GetError, PostError, PutError, DeleteError):
     pass
 
 
+class UnsupportedMediaTypeError(PostError, PutError):
+    pass
+
+
 E = TypeVar("E", bound=Exception)
 Resolver = Callable[[Any], Type[E]]
 V = tuple[Optional[Type[E]], Optional[Resolver]]
@@ -100,20 +104,22 @@ class ErrorMapping(Generic[E]):
     def update(self, mapping: ErrorMapping) -> None:
         self._errors.update(mapping._errors)
 
-    @property
     def default(self) -> type[E]:
         return self._default
 
 
-def resolve_put_400(content: dict) -> type[PutError]:
-    if isinstance(content["message"], str):
-        error = MalformedBodyError
+def resolve_put_400(content: dict[str, str] | str) -> type[PutError]:
+    if isinstance(content, dict):
+        if isinstance(content["message"], str):
+            error = MalformedBodyError
+        else:
+            error = MissingPathError
     else:
-        error = MissingPathError
+        error = PutError
     return error
 
 
-possible_codes = (400, 401, 403, 404, 500)
+possible_codes = (400, 401, 403, 404, 415, 500)
 
 auth_errors = ErrorMapping(AuthError)
 auth_errors.put(401, WrongCredentialsError)
@@ -128,11 +134,13 @@ get_errors.update(crud_errors)
 
 post_errors = ErrorMapping(PostError)
 post_errors.update(crud_errors)
+post_errors.put(415, UnsupportedMediaTypeError)
 post_errors.put(400, DuplicateDataError)
 
 put_errors = ErrorMapping(PutError)
 put_errors.update(crud_errors)
 put_errors.put(400, resolver=resolve_put_400)
+put_errors.put(415, UnsupportedMediaTypeError)
 put_errors.put(500, DuplicateDataError)
 
 delete_errors = ErrorMapping(DeleteError)

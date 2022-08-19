@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import abc
 import asyncio
+import mimetypes
 from contextlib import AbstractAsyncContextManager
 from typing import Any
 from typing import Awaitable
@@ -10,12 +12,11 @@ from typing import Iterable
 from typing import Mapping
 from typing import cast
 
+from keyring.credentials import Credential
+
 from . import errors
 from . import urls
 from . import utils
-from .auth import TOKEN_KEY
-from .auth import ApiToken
-from .auth import AsyncTokenAuth
 from .base import ASYNC_CACHING_ENABLED
 from .base import ASYNC_ENABLED
 from .base import ASYNC_IMPORT_ERROR_MSG
@@ -24,19 +25,24 @@ from .base import AsyncCacheable
 from .base import AsyncCloseable
 from .base import AsyncHttpAuth
 from .base import BaseActiveHatModel
+from .base import BaseApiToken
 from .base import BaseHatClient
 from .base import BaseHttpClient
 from .base import BaseResponse
 from .base import BaseResponseError
 from .base import BaseResponseHandler
+from .base import HttpAuth
 from .base import IStringLike
 from .base import Models
 from .base import StringLike
-from .base import ensure_iterable
-from .base import requires_namespace
+from .model import TOKEN_HEADER
+from .model import TOKEN_KEY
 from .model import GetOpts
 from .model import HatModel
 from .model import HatRecord
+from .model import JwtAppToken
+from .model import JwtOwnerToken
+from .model import JwtToken
 from .model import M
 
 
@@ -57,23 +63,18 @@ class AsyncResponse(BaseResponse):
     def __init__(self, wrapped: AsyncClientResponse) -> None:
         self._wrapped = wrapped
 
-    @property
     def method(self) -> str:
         return self._wrapped.method.lower()
 
-    @property
     def headers(self) -> dict[str, str]:
         return dict(self._wrapped.headers)
 
-    @property
     def url(self) -> str:
         return str(self._wrapped.url)
 
-    @property
     async def raw(self) -> bytes:
         return await self._wrapped.read()
 
-    @property
     async def text(self) -> str:
         return await self._wrapped.text()
 
@@ -88,40 +89,36 @@ class AsyncResponseError(BaseResponseError):
         super().__init__(wrapped)
         self._wrapped = wrapped
 
-    @property
     def method(self) -> str:
         return self._wrapped.request_info.method.lower()
 
-    @property
     def url(self) -> str:
         return str(self._wrapped.request_info.url)
 
-    @property
-    def content(self) -> dict[str, str]:
-        return utils.loads(self._wrapped.message)
+    def content(self) -> str:
+        return f"{self.status} Error: {self.url}"
 
-    @property
     def status(self) -> int:
         return self._wrapped.status
 
 
 class AsyncResponseHandler(BaseResponseHandler):
-    @staticmethod
-    async def on_success(response: AsyncResponse, **kwargs) -> str | list[M] | None:
-        url = response.url
+    async def on_success(
+        self, response: AsyncResponse, **kwargs
+    ) -> str | list[M] | None:
+        url = response.url()
         if urls.is_pk_endpoint(url):
-            return await response.text
+            return await response.text()
         elif urls.is_token_endpoint(url):
-            return utils.loads(await response.text)[TOKEN_KEY]
-        elif response.method == "delete":
+            return utils.loads(await response.text())[TOKEN_KEY]
+        elif response.method() == "delete":
             return None
         elif urls.is_api_endpoint(url):
-            return HatRecord.parse(await response.raw, kwargs["mtypes"])
+            return HatRecord.parse(await response.raw(), kwargs["mtypes"])
         else:
             return super()._success_handling_failed(response)
 
-    @staticmethod
-    async def on_error(error: AsyncResponseError, **kwargs) -> None:
+    async def on_error(self, error: AsyncResponseError, **kwargs) -> None:
         super().on_error(error, **kwargs)
 
 
@@ -154,8 +151,7 @@ class AsyncHttpClient(
         **kwargs,
     ) -> Any:
         auth = auth or self._auth
-        auth_headers = await auth.headers()
-        headers = headers | auth_headers if headers else auth_headers
+        headers = headers | await auth.headers() if headers else await auth.headers()
         async with self._session.request(
             method, url, headers=headers, data=data, params=params
         ) as response:
@@ -177,7 +173,6 @@ class AsyncHttpClient(
         if ASYNC_CACHING_ENABLED and isinstance(self._session, AsyncCachedSession):
             return await self._session.close()
 
-    @property
     def _is_async(self) -> bool:
         return True
 
@@ -189,21 +184,131 @@ class AsyncHttpClient(
         return await self._session.__aexit__(*args)
 
 
+class AsyncApiToken(BaseApiToken, abc.ABC):
+    def __init__(
+        self, http_client: BaseHttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
+    ) -> None:
+        super().__init__(http_client, auth, jwt_type)
+
+    async def pk(self) -> str:
+        if self._pk is None:
+            url = urls.domain_pk(await self.domain())
+            self._pk = await self._get(url)
+        return self._pk
+
+    async def value(self) -> str:
+        if self._value is None or self.expired():
+            token = await self._get(await self.url())
+            await self.set_value(token)
+        return self._value
+
+    async def set_value(self, value: str) -> None:
+        if self._value != value:
+            self._value = value
+            self._decoded = await self.decode(verify=True)
+            self._expires = self._compute_expiration()
+
+    async def domain(self) -> str:
+        if self._domain is None:
+            token = await self.decode(verify=False)
+            self._domain = urls.with_scheme(token.iss)
+        return self._domain
+
+    async def decode(self, *, verify: bool = True) -> JwtToken:
+        value = await self.value()
+        pk = await self.pk() if verify else None
+        return self._jwt_type.decode(value, pk=pk, verify=verify)
+
+    @abc.abstractmethod
+    async def url(self) -> str:
+        pass
+
+    async def _get(self, url: str) -> str:
+        return await self._http.request("get", url, auth=self._auth)
+
+
+class AsyncCredentialOwnerToken(AsyncApiToken):
+    __slots__ = "_url"
+
+    def __init__(self, http_client: AsyncHttpClient, credential: Credential) -> None:
+        super().__init__(http_client, AsyncCredentialAuth(credential), JwtOwnerToken)
+        self._url = urls.username_owner_token(credential.username)
+
+    async def url(self) -> str:
+        return self._url
+
+
+class AsyncAppToken(AsyncApiToken):
+    __slots__ = "_owner_token", "_app_id", "_url"
+
+    def __init__(
+        self,
+        client: AsyncHttpClient,
+        owner_token: AsyncCredentialOwnerToken,
+        app_id: str,
+    ) -> None:
+        super().__init__(client, AsyncTokenAuth(owner_token), JwtAppToken)
+        self._owner_token = owner_token
+        self._app_id = app_id
+        self._url: str | None = None
+
+    async def domain(self) -> str:
+        # Must defer to owner token to avoid infinite recursion.
+        return await self._owner_token.domain()
+
+    async def url(self) -> str:
+        if self._url is None:
+            self._url = urls.domain_app_token(await self.domain(), self._app_id)
+        return self._url
+
+
+class AsyncWebOwnerToken(AsyncApiToken, abc.ABC):  # TODO
+    pass
+
+
+class AsyncTokenAuth(AsyncHttpAuth):
+    __slots__ = "_token"
+
+    def __init__(self, token: AsyncApiToken):
+        self._token = token
+
+    async def headers(self) -> dict[str, str]:
+        return {TOKEN_HEADER: await self._token.value()}
+
+    async def on_response(self, response: AsyncResponse) -> None:
+        headers = response.headers()
+        if TOKEN_HEADER in headers:
+            await self._token.set_value(headers[TOKEN_HEADER])
+
+
+class AsyncCredentialAuth(AsyncHttpAuth):
+    __slots__ = "_credential"
+
+    def __init__(self, credential: Credential):
+        self._credential = credential
+
+    async def headers(self) -> dict[str, str]:
+        return {
+            "Accept": mimetypes.types_map[".json"],
+            "username": self._credential.username,
+            "password": self._credential.password,
+        }
+
+
 class AsyncHatClient(
     BaseHatClient, AsyncCacheable, AsyncCloseable, AbstractAsyncContextManager
 ):
     def __init__(
         self,
         http_client: AsyncHttpClient,
-        token: ApiToken,
+        token: AsyncApiToken,
         namespace: str | None = None,
     ) -> None:
         super().__init__(http_client, token, namespace)
 
-    def _new_token_auth(self, token: ApiToken) -> AsyncHttpAuth:
+    def _new_token_auth(self, token: AsyncApiToken) -> AsyncHttpAuth:
         return AsyncTokenAuth(token)
 
-    @requires_namespace
     async def get(
         self,
         endpoint: StringLike,
@@ -212,48 +317,47 @@ class AsyncHatClient(
     ) -> list[M]:
         return await super().get(endpoint, mtype, options)
 
-    @ensure_iterable
-    @requires_namespace
     async def post(self, models: Models) -> list[M]:
         return await super().post(models)
 
-    @staticmethod
-    async def _gather_posted(posted: Iterable) -> list[M]:
+    async def _gather_posted(self, posted: Iterable) -> list[M]:
         return super()._gather_posted(await asyncio.gather(*posted))
 
-    @ensure_iterable
     async def put(self, models: Models) -> list[M]:
         return await super().put(models)
 
-    @ensure_iterable
     async def delete(self, record_ids: StringLike | IStringLike) -> None:
         return await super().delete(record_ids)
 
     async def _endpoint_request(self, method: str, endpoint: str, **kwargs) -> list[M]:
-        url = urls.domain_endpoint(await self._token.domain, self._namespace, endpoint)
+        url = urls.domain_endpoint(
+            await self.token().domain(), self._namespace, endpoint
+        )
         return await self._request(method, url, **kwargs)
 
     async def _data_request(self, method: str, **kwargs) -> list[M] | None:
-        url = urls.domain_data(await self._token.domain)
+        url = urls.domain_data(await self.token().domain())
         return await self._request(method, url, **kwargs)
 
     async def _request(self, method: str, url: str, **kwargs) -> list[M] | None:
-        return await self._client.request(method, url, auth=self._auth, **kwargs)
+        return await self._client().request(method, url, auth=self._auth, **kwargs)
 
     async def clear_cache(self) -> None:
-        return await self._client.clear_cache()
+        return await self._client().clear_cache()
 
     async def close(self) -> None:
-        return await self._client.close()
+        return await self._client().close()
 
     async def __aenter__(self) -> AsyncHatClient:
-        await self._client.__aenter__()
+        await self._client().__aenter__()
         return self
 
     async def __aexit__(self, *args) -> None:
-        return await self._client.__aexit__(*args)
+        return await self._client().__aexit__(*args)
 
-    @property
+    def token(self) -> AsyncApiToken:
+        return cast(AsyncApiToken, super().token())
+
     def _client(self) -> AsyncHttpClient:
         return cast(AsyncHttpClient, self._http)
 

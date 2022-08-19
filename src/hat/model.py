@@ -1,3 +1,4 @@
+import re
 from abc import ABC
 from enum import Enum
 from typing import Any
@@ -7,19 +8,28 @@ from typing import Iterable
 from typing import Optional
 from typing import Type
 from typing import TypeVar
+from typing import Union
 
+import jwt
 import pydantic
 from humps import camel
 from pydantic import BaseConfig
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic import NonNegativeInt
+from pydantic import PositiveInt
 from pydantic import StrictStr
 from pydantic import conint
 from pydantic import constr
 from pydantic.generics import GenericModel
 
+from . import errors
 from . import utils
+
+
+JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
+TOKEN_KEY = "accessToken"
+TOKEN_HEADER = "x-auth-token"
 
 
 class HatConfig(BaseConfig):
@@ -94,9 +104,9 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
         records = map(cls._from_model, models)
         dump = cls.__config__.json_dumps
         if data_only:
-            records = [dump(r.data) for r in records]
+            records = [r.data for r in records]
         else:
-            records = [r.json() for r in records]
+            records = [r.dict() for r in records]
         return dump(records)
 
     @classmethod
@@ -124,3 +134,54 @@ class GetOpts(BaseApiModel):
 
     def json(self, exclude_none: bool = True, **kwargs) -> Optional[str]:
         return super().json(exclude_none=exclude_none, **kwargs)
+
+
+class JwtToken(BaseModel):
+    exp: PositiveInt
+    iat: PositiveInt
+    iss: constr(regex=r"^\w+\.hubat\.net$", strict=True)  # noqa: F722
+
+    Config = ApiConfig
+
+    @classmethod
+    def decode(
+        cls,
+        encoded: str,
+        *,
+        pk: Optional[str] = None,
+        verify: bool = False,
+        as_token: bool = False,
+    ) -> Union[dict, "JwtToken"]:
+        if verify and pk is None:
+            raise ValueError("'pk' is required if 'verify' is True")
+        if JWT_PATTERN.match(encoded) is None:
+            raise ValueError(f"'encoded' has improper syntax:\n{encoded}")
+        try:
+            payload = jwt.decode(
+                jwt=encoded,
+                key=pk,
+                algorithms=["RS256"],
+                options={"verify_signature": verify},
+            )
+        except jwt.InvalidTokenError as error:
+            raise errors.AuthError() from error
+        return payload if not as_token else JwtToken(**payload)
+
+
+class JwtOwnerToken(JwtToken):
+    access_scope: constr(regex="^owner$", strict=True)  # noqa: F722
+
+    @classmethod
+    def decode(cls, encoded: str, **kwargs) -> "JwtOwnerToken":
+        kwargs["as_token"] = False
+        return JwtOwnerToken(**super().decode(encoded, **kwargs))
+
+
+class JwtAppToken(JwtToken):
+    application: StrictStr
+    application_version: constr(regex=r"^\d+.\d+.\d+$", strict=True)  # noqa: F722
+
+    @classmethod
+    def decode(cls, encoded: str, **kwargs) -> "JwtAppToken":
+        kwargs["as_token"] = False
+        return JwtAppToken(**super().decode(encoded, **kwargs))

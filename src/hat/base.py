@@ -18,15 +18,13 @@ from typing import Iterator
 from typing import TypeVar
 from typing import Union
 
-from keyring.credentials import Credential
-
 from . import errors
 from . import urls
 from . import utils
-from .auth import ApiToken
 from .model import GetOpts
 from .model import HatModel
 from .model import HatRecord
+from .model import JwtToken
 from .model import M
 
 
@@ -69,8 +67,9 @@ try:
 except ImportError:
     SYNC_CACHING_ENABLED = False
 
+SYNC_IMPORT_ERROR_MSG = "Must install package with 'sync' option"
+ASYNC_IMPORT_ERROR_MSG = "Must install package with 'async' option"
 
-TOKEN_HEADER = "x-auth-token"
 NEVER_CACHE = 0
 SESSION_DEFAULTS = {
     "headers": {"Content-Type": mimetypes.types_map[".json"]},
@@ -81,14 +80,16 @@ SESSION_DEFAULTS = {
         urls.domain_owner_token("*"): NEVER_CACHE,
         urls.domain_app_token("*", "*"): NEVER_CACHE,
     },
+    "stream": True,
 }
+
+SESSION_DEFAULTS["allowable_codes"] = SESSION_DEFAULTS["allowed_codes"]
+SESSION_DEFAULTS["allowable_methods"] = SESSION_DEFAULTS["allowed_methods"]
+
 
 Models = Union[M, Iterator[M], Collection[M]]
 StringLike = Union[str, HatModel]
 IStringLike = Iterable[StringLike]
-
-SYNC_IMPORT_ERROR_MSG = "Must install package with 'sync' option"
-ASYNC_IMPORT_ERROR_MSG = "Must install package with 'async' option"
 
 
 def requires_namespace(method: Callable) -> Callable:
@@ -133,27 +134,22 @@ def group_by_endpoint(models: Iterable[M]) -> Iterable[tuple[str, list[M]]]:
 
 
 class BaseResponse(abc.ABC):
-    @property
     @abc.abstractmethod
     def method(self) -> str:
         pass
 
-    @property
     @abc.abstractmethod
     def headers(self) -> dict[str, str]:
         pass
 
-    @property
     @abc.abstractmethod
     def url(self) -> str:
         pass
 
-    @property
     @abc.abstractmethod
     def raw(self) -> bytes:
         pass
 
-    @property
     @abc.abstractmethod
     def text(self) -> str:
         pass
@@ -164,49 +160,44 @@ class BaseResponse(abc.ABC):
 
 
 class BaseResponseError(Exception, abc.ABC):
-    @property
     @abc.abstractmethod
     def method(self) -> str:
         pass
 
-    @property
     @abc.abstractmethod
     def url(self) -> str:
         pass
 
-    @property
     @abc.abstractmethod
     def content(self) -> Any:
         pass
 
-    @property
     @abc.abstractmethod
     def status(self) -> int:
         pass
 
 
 class BaseResponseHandler(abc.ABC):
-    @staticmethod
     @abc.abstractmethod
-    def on_success(response: BaseResponse, **kwargs) -> str | list[M] | None:
+    def on_success(self, response: BaseResponse, **kwargs) -> str | list[M] | None:
         pass
 
     @staticmethod
     def _success_handling_failed(response: BaseResponse) -> None:
-        headers = pprint.pformat(response.headers, indent=2)
+        headers = pprint.pformat(response.headers(), indent=2)
         raise ValueError(
             f"Unable to process response for URL {response.url}\n{headers}"
         )
 
-    @staticmethod
-    def on_error(error: BaseResponseError, **kwargs) -> None:
-        url, status, content = error.url, error.status, error.content
+    def on_error(self, error: BaseResponseError, **kwargs) -> None:
+        url = error.url()
         if urls.is_auth_endpoint(url):
-            raise errors.find_error("auth", status, content)
+            wrapper = errors.find_error("auth", error.status(), error.content())
         elif urls.is_api_endpoint(url):
-            raise errors.find_error(error.method, status, content)
+            wrapper = errors.find_error(error.method(), error.status(), error.content())
         else:
-            raise error
+            wrapper, error = error, None
+        raise wrapper(error)
 
 
 class Cacheable:
@@ -253,56 +244,6 @@ class AsyncHttpAuth(HttpAuth):
         return super().on_response(response)
 
 
-class TokenAuth(HttpAuth):
-    __slots__ = "_token"
-
-    def __init__(self, token: ApiToken):
-        self._token = token
-
-    def headers(self) -> dict[str, str]:
-        return {TOKEN_HEADER: self._token.value}
-
-    def on_response(self, response: BaseResponse) -> None:
-        if TOKEN_HEADER in response.headers:
-            return self._token.set_value(response.headers[TOKEN_HEADER])
-
-
-class AsyncTokenAuth(AsyncHttpAuth):
-    __slots__ = "_token"
-
-    def __init__(self, token: ApiToken):
-        self._token = token
-
-    async def headers(self) -> dict[str, str]:
-        return {TOKEN_HEADER: await self._token.value}
-
-    async def on_response(self, response: BaseResponse) -> None:
-        if TOKEN_HEADER in response.headers:
-            return await self._token.set_value(response.headers[TOKEN_HEADER])
-
-
-class CredentialAuth(HttpAuth):
-    __slots__ = "_credential"
-
-    def __init__(self, credential: Credential):
-        self._credential = credential
-
-    def headers(self) -> dict[str, str]:
-        return {
-            "Accept": mimetypes.types_map[".json"],
-            "username": self._credential.username,
-            "password": self._credential.password,
-        }
-
-
-class AsyncCredentialAuth(CredentialAuth, AsyncHttpAuth):
-    def __init__(self, credential: Credential):
-        super().__init__(credential)
-
-    async def headers(self) -> dict[str, str]:
-        return super().headers()
-
-
 class BaseHttpClient(abc.ABC):
     __slots__ = "_session", "_handler", "_auth"
 
@@ -326,11 +267,11 @@ class BaseHttpClient(abc.ABC):
 
     def _new_session(self, **kwargs) -> Any:
         kwargs = SESSION_DEFAULTS | kwargs
-        if self._is_async:
+        if self._is_async():
             if not ASYNC_ENABLED:
                 raise ImportError(ASYNC_IMPORT_ERROR_MSG)
             elif ASYNC_CACHING_ENABLED:
-                cache = kwargs.pop("backend", None) or AsyncCacheBackend(**kwargs)
+                cache = kwargs.pop("cache", None) or AsyncCacheBackend(**kwargs)
                 session = AsyncCachedSession(cache=cache, **kwargs)
             else:
                 params = inspect.signature(AsyncClientSession.__init__).parameters
@@ -340,10 +281,12 @@ class BaseHttpClient(abc.ABC):
             if not SYNC_ENABLED:
                 raise ImportError(SYNC_IMPORT_ERROR_MSG)
             elif SYNC_CACHING_ENABLED:
-                cache = kwargs.pop("backend", None) or CacheBackend(**kwargs)
+                cache = kwargs.pop("cache", None) or CacheBackend(**kwargs)
                 session = CachedSession(backend=cache, **kwargs)
             else:
                 session = ClientSession()
+            session.headers = kwargs["headers"]
+            session.stream = kwargs["stream"]
         return session
 
     @abc.abstractmethod
@@ -360,19 +303,82 @@ class BaseHttpClient(abc.ABC):
     ) -> Any:
         pass
 
-    @property
     @abc.abstractmethod
     def _is_async(self) -> bool:
         pass
 
 
-class BaseHatClient(Cacheable, abc.ABC):
+class BaseApiToken(abc.ABC):
+    __slots__ = (
+        "_http",
+        "_auth",
+        "_jwt_type",
+        "_value",
+        "_decoded",
+        "_pk",
+        "_ttl",
+        "_domain",
+        "_expires",
+    )
+
+    def __init__(
+        self, http_client: BaseHttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
+    ) -> None:
+        self._http = http_client
+        self._auth = auth
+        self._jwt_type = jwt_type
+        self._value: str | None = None
+        self._decoded: JwtToken | None = None
+        self._pk: str | None = None
+        self._ttl = datetime.timedelta(days=3)
+        self._domain: str | None = None
+        self._expires = datetime.datetime.max
+
+    @abc.abstractmethod
+    def pk(self) -> str:
+        pass
+
+    @abc.abstractmethod
+    def value(self) -> str:
+        pass
+
+    @abc.abstractmethod
+    def set_value(self, value: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def domain(self) -> str:
+        pass
+
+    @abc.abstractmethod
+    def decode(self, *, verify: bool = True) -> JwtToken:
+        pass
+
+    @abc.abstractmethod
+    def url(self) -> str:
+        pass
+
+    def expired(self) -> bool:
+        return self._expires <= datetime.datetime.utcnow()
+
+    def _compute_expiration(self) -> datetime.datetime:
+        iat = datetime.datetime.utcfromtimestamp(float(self._decoded.iat))
+        exp = datetime.datetime.utcfromtimestamp(float(self._decoded.exp))
+        return min(iat + self._ttl, exp)
+
+    def __repr__(self) -> str:
+        return utils.to_str(
+            self, domain=self._domain, expired=self.expired(), expires=self._expires
+        )
+
+
+class BaseHatClient(abc.ABC):
     __slots__ = "_http", "_auth", "_token", "_namespace", "_pattern"
 
     def __init__(
         self,
         http_client: BaseHttpClient,
-        token: ApiToken,
+        token: BaseApiToken,
         namespace: str | None = None,
     ) -> None:
         self._http = http_client
@@ -382,7 +388,7 @@ class BaseHatClient(Cacheable, abc.ABC):
         self._pattern = re.compile(rf"^{namespace}/")
 
     @abc.abstractmethod
-    def _new_token_auth(self, token: ApiToken) -> HttpAuth:
+    def _new_token_auth(self, token: BaseApiToken) -> HttpAuth:
         pass
 
     @requires_namespace
@@ -395,36 +401,33 @@ class BaseHatClient(Cacheable, abc.ABC):
         if options:
             options = options.json()
         endpoint = self._prepare_get(endpoint)
-        return self._endpoint_request("GET", endpoint, data=options, mtypes=[mtype])
+        return self._endpoint_request("get", endpoint, data=options, mtypes=[mtype])
 
     @ensure_iterable
     @requires_namespace
     def post(self, models: Models) -> list[M]:
         return self._gather_posted(
-            self._endpoint_request("POST", endpoint, data=data, mtypes=mtypes)
+            self._endpoint_request("post", endpoint, data=data, mtypes=mtypes)
             for endpoint, data, mtypes in self._prepare_post(models)
         )
 
-    @staticmethod
-    def _gather_posted(posted: Iterable) -> list[M]:
+    def _gather_posted(self, posted: Iterable) -> list[M]:
         return list(itertools.chain.from_iterable(posted))
 
     @ensure_iterable
     def put(self, models: Models) -> list[M] | Awaitable[list[M]]:
         data, mtypes = self._prepare_put(models)
-        return self._data_request("PUT", data=data, mtypes=mtypes)
+        return self._data_request("put", data=data, mtypes=mtypes)
 
     @ensure_iterable
     def delete(self, record_ids: StringLike | IStringLike) -> None | Awaitable:
         params = self._prepare_delete(record_ids)
-        return self._data_request("DELETE", params=params)
+        return self._data_request("delete", params=params)
 
-    @property
     def namespace(self) -> str | None:
         return self._namespace
 
-    @property
-    def token(self) -> ApiToken:
+    def token(self) -> BaseApiToken:
         return self._token
 
     @abc.abstractmethod
@@ -474,7 +477,7 @@ class BaseHatClient(Cacheable, abc.ABC):
         return {"records": record_ids}
 
     def __repr__(self) -> str:
-        return utils.to_str(self, token=self.token, namespace=self.namespace)
+        return utils.to_str(self, token=self.token(), namespace=self.namespace())
 
 
 class BaseActiveHatModel(HatModel, abc.ABC):
@@ -511,9 +514,8 @@ class BaseActiveHatModel(HatModel, abc.ABC):
         return cls._client().get(endpoint, cls, options)
 
     @classmethod
-    def _client(cls) -> C:
+    def _client(cls) -> BaseHatClient:
         return cls.client  # ClassVar interferes with type checking.
 
 
-C = TypeVar("C", bound=BaseHatClient)
 A = TypeVar("A", bound=BaseActiveHatModel)
