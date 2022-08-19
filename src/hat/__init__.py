@@ -34,3 +34,4 @@ from .model import HatConfig
 from .model import HatModel
 from .model import M
 from .model import Ordering
+from .utils import set_synchronizer
