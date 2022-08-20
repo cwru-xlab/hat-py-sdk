@@ -76,7 +76,7 @@ _Resolver = Callable[[Any], Type[_E]]
 _V = tuple[Optional[Type[_E]], Optional[_Resolver]]
 
 
-class _ErrorMapping(Generic[_E]):
+class ErrorMapping(Generic[_E]):
     __slots__ = "_default", "_errors"
 
     def __init__(self, default: type[_E]):
@@ -101,7 +101,7 @@ class _ErrorMapping(Generic[_E]):
             raise ValueError("Either 'error' or 'resolver' must be specified")
         self._errors[status] = (error, resolver)
 
-    def update(self, mapping: _ErrorMapping) -> None:
+    def update(self, mapping: ErrorMapping) -> None:
         self._errors.update(mapping._errors)
 
     def default(self) -> type[_E]:
@@ -121,44 +121,44 @@ def _resolve_put_400(content: dict[str, str] | str) -> type[PutError]:
 
 POSSIBLE_CODES = (400, 401, 403, 404, 415, 500)
 
-_auth_errors = _ErrorMapping(AuthError)
-_auth_errors.put(401, WrongCredentialsError)
-_auth_errors.put(404, HatNotFoundError)
+auth_errors = ErrorMapping(AuthError)
+auth_errors.put(401, WrongCredentialsError)
+auth_errors.put(404, HatNotFoundError)
 
-_crud_errors = _ErrorMapping(HatError)
-_crud_errors.put(401, WrongTokenError)
-_crud_errors.put(403, LimitedTokenScopeError)
+crud_errors = ErrorMapping(HatError)
+crud_errors.put(401, WrongTokenError)
+crud_errors.put(403, LimitedTokenScopeError)
 
-_get_errors = _ErrorMapping(GetError)
-_get_errors.update(_crud_errors)
+get_errors = ErrorMapping(GetError)
+get_errors.update(crud_errors)
 
-_post_errors = _ErrorMapping(PostError)
-_post_errors.update(_crud_errors)
-_post_errors.put(415, UnsupportedMediaTypeError)
-_post_errors.put(400, DuplicateDataError)
+post_errors = ErrorMapping(PostError)
+post_errors.update(crud_errors)
+post_errors.put(415, UnsupportedMediaTypeError)
+post_errors.put(400, DuplicateDataError)
 
-_put_errors = _ErrorMapping(PutError)
-_put_errors.update(_crud_errors)
-_put_errors.put(400, resolver=_resolve_put_400)
-_put_errors.put(415, UnsupportedMediaTypeError)
-_put_errors.put(500, DuplicateDataError)
+put_errors = ErrorMapping(PutError)
+put_errors.update(crud_errors)
+put_errors.put(400, resolver=_resolve_put_400)
+put_errors.put(415, UnsupportedMediaTypeError)
+put_errors.put(500, DuplicateDataError)
 
-_delete_errors = _ErrorMapping(DeleteError)
-_delete_errors.update(_crud_errors)
-_delete_errors.put(400, RecordNotFoundError)
+delete_errors = ErrorMapping(DeleteError)
+delete_errors.update(crud_errors)
+delete_errors.put(400, RecordNotFoundError)
 
-_errors: dict[str, _ErrorMapping] = {
-    "auth": _auth_errors,
-    "get": _get_errors,
-    "post": _post_errors,
-    "put": _put_errors,
-    "delete": _delete_errors,
+all_errors: dict[str, ErrorMapping] = {
+    "auth": auth_errors,
+    "get": get_errors,
+    "post": post_errors,
+    "put": put_errors,
+    "delete": delete_errors,
 }
 
 
 def find_error(kind: str, status: int, content: Any) -> type[HatError]:
     key = kind.lower().strip()
-    if key in _errors:
-        return _errors[key].get(status, content)
+    if key in all_errors:
+        return all_errors[key].get(status, content)
     else:
-        raise ValueError(f"'kind' must be one of {list(_errors.keys())}; got {kind}")
+        raise ValueError(f"'kind' must be one of {list(all_errors.keys())}; got {kind}")

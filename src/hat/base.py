@@ -18,14 +18,14 @@ from typing import Iterator
 from typing import TypeVar
 from typing import Union
 
-from . import _urls
-from . import _utils
 from . import errors
+from . import urls
+from . import utils
 from .model import GetOpts
 from .model import HatModel
+from .model import HatRecord
 from .model import JwtToken
 from .model import M
-from .model import _HatRecord
 
 
 try:
@@ -70,9 +70,6 @@ except ImportError:
 SYNC_IMPORT_ERROR_MSG = "Must install package with 'sync' option"
 ASYNC_IMPORT_ERROR_MSG = "Must install package with 'async' option"
 
-TOKEN_KEY = "accessToken"
-TOKEN_HEADER = "x-auth-token"
-
 NEVER_CACHE = 0
 SESSION_DEFAULTS = {
     "headers": {"Content-Type": mimetypes.types_map[".json"]},
@@ -80,14 +77,17 @@ SESSION_DEFAULTS = {
     "allowed_methods": ["GET", "POST"],
     "expire_after": datetime.timedelta(minutes=10),
     "urls_expire_after": {
-        _urls.domain_owner_token("*"): NEVER_CACHE,
-        _urls.domain_app_token("*", "*"): NEVER_CACHE,
+        urls.domain_owner_token("*"): NEVER_CACHE,
+        urls.domain_app_token("*", "*"): NEVER_CACHE,
     },
     "stream": True,
 }
 # requests-cache and asyncio-client-cache use slightly different naming.
 SESSION_DEFAULTS["allowable_codes"] = SESSION_DEFAULTS["allowed_codes"]
 SESSION_DEFAULTS["allowable_methods"] = SESSION_DEFAULTS["allowed_methods"]
+
+TOKEN_KEY = "accessToken"
+TOKEN_HEADER = "x-auth-token"
 
 Models = Union[M, Iterator[M], Collection[M]]
 StringLike = Union[str, HatModel]
@@ -193,9 +193,9 @@ class BaseResponseHandler(abc.ABC):
 
     def on_error(self, error: BaseResponseError, **kwargs) -> None:
         url = error.url()
-        if _urls.is_auth_endpoint(url):
+        if urls.is_auth_endpoint(url):
             wrapper = errors.find_error("auth", error.status(), error.content())
-        elif _urls.is_api_endpoint(url):
+        elif urls.is_api_endpoint(url):
             wrapper = errors.find_error(error.method(), error.status(), error.content())
         else:
             wrapper, error = error, None
@@ -369,7 +369,7 @@ class BaseApiToken(abc.ABC):
         return min(iat + self._ttl, exp)
 
     def __repr__(self) -> str:
-        return _utils.to_str(
+        return utils.to_str(
             self, domain=self._domain, expired=self.expired(), expires=self._expires
         )
 
@@ -456,7 +456,7 @@ class BaseHatClient(abc.ABC):
                 m.endpoint = self._pattern.split(m.endpoint)[-1]
             formatted.append(m)
         for endpoint, models in group_by_endpoint(formatted):
-            records = _HatRecord.to_json(models, data_only=True)
+            records = HatRecord.to_json(models, data_only=True)
             yield endpoint, records, map(type, models)
 
     def _prepare_put(self, models: Iterable[M]) -> tuple[str, Iterable[type]]:
@@ -468,7 +468,7 @@ class BaseHatClient(abc.ABC):
             if self._pattern.match(m.endpoint) is None:
                 m.endpoint = f"{self._namespace}/{m.endpoint}"
             formatted.append(m)
-        return _HatRecord.to_json(formatted), map(type, models)
+        return HatRecord.to_json(formatted), map(type, models)
 
     @staticmethod
     def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:
@@ -479,20 +479,20 @@ class BaseHatClient(abc.ABC):
         return {"records": record_ids}
 
     def __repr__(self) -> str:
-        return _utils.to_str(self, token=self.token(), namespace=self.namespace())
+        return utils.to_str(self, token=self.token(), namespace=self.namespace())
 
 
 class BaseActiveHatModel(HatModel, abc.ABC):
     client: ClassVar[BaseHatClient]
 
-    def save(self, endpoint: str | None = None) -> _A | Awaitable[_A]:
+    def save(self, endpoint: str | None = None) -> B | Awaitable[B]:
         if endpoint is not None:
             self.endpoint = endpoint
         has_id = self.record_id is not None
         try_first = self._client().put if has_id else self._client().post
         return self._save(try_first, has_id)
 
-    def _save(self, try_first: Callable, has_id: bool) -> _A | Awaitable[_A]:
+    def _save(self, try_first: Callable, has_id: bool) -> B | Awaitable[B]:
         try:
             saved = try_first(self)
         except errors.PutError as error:
@@ -512,7 +512,7 @@ class BaseActiveHatModel(HatModel, abc.ABC):
     @classmethod
     def get(
         cls, endpoint: StringLike, options: GetOpts | None = None
-    ) -> list[_A] | Awaitable[list[_A]]:
+    ) -> list[B] | Awaitable[list[B]]:
         return cls._client().get(endpoint, cls, options)
 
     @classmethod
@@ -520,4 +520,4 @@ class BaseActiveHatModel(HatModel, abc.ABC):
         return cls.client  # ClassVar interferes with type checking.
 
 
-_A = TypeVar("_A", bound=BaseActiveHatModel)
+B = TypeVar("B", bound=BaseActiveHatModel)
