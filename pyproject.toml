@@ -21,7 +21,7 @@ cchardet = { optional = true, version = "^2.1.7" }
 humps = "^0.2.2"
 keyring = "^23.8.2"
 orjson = { optional = true, version = "^3.7.12" }
-pydantic = "^1.9.1"
+pydantic = { extras = ["dotenv"], version = "^1.9.1" }
 python-ulid = { optional = true, version = "^1.1.0" }
 requests = { optional = true, version = "^2.28.1" }
 requests-cache = { optional = true, version = "^0.9.5" }
