@@ -399,7 +399,7 @@ class BaseHatClient(abc.ABC):
         endpoint: StringLike,
         mtype: type[M] = HatModel,
         options: GetOpts | None = None,
-    ) -> list[M] | Awaitable:
+    ) -> list[M] | Awaitable[list[M]]:
         if options:
             options = options.json()
         endpoint = self._prepare_get(endpoint)
