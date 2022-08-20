@@ -23,28 +23,28 @@ from pydantic import conint
 from pydantic import constr
 from pydantic.generics import GenericModel
 
+from . import _utils
 from . import errors
-from . import utils
 
 
-JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
+_JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
 
 
 class HatConfig(BaseConfig):
     allow_population_by_field_name = True
     use_enum_values = True
-    json_dumps = utils.dumps
-    json_loads = utils.loads
+    json_dumps = _utils.dumps
+    json_loads = _utils.loads
     underscore_attrs_are_private = True
 
 
-class ApiConfig(HatConfig):
+class _ApiConfig(HatConfig):
     alias_generator = camel.case
     allow_mutation = False
 
 
-class BaseApiModel(BaseModel, ABC):
-    Config = ApiConfig
+class _BaseApiModel(BaseModel, ABC):
+    Config = _ApiConfig
 
     def dict(self, by_alias: bool = True, **kwargs) -> dict[str, Any]:
         return super().dict(by_alias=by_alias, **kwargs)
@@ -53,15 +53,15 @@ class BaseApiModel(BaseModel, ABC):
         return super().json(by_alias=by_alias, **kwargs)
 
 
-class BaseHatModel(BaseModel, ABC):
+class _BaseHatModel(BaseModel, ABC):
     endpoint: Optional[StrictStr]
     record_id: Optional[StrictStr]
 
     Config = HatConfig
 
 
-class HatModel(BaseHatModel):
-    uid: str = Field(default_factory=utils.uid)
+class HatModel(_BaseHatModel):
+    uid: str = Field(default_factory=_utils.uid)
 
     class Config:
         extra = pydantic.Extra.allow
@@ -71,7 +71,7 @@ class HatModel(BaseHatModel):
 M = TypeVar("M", bound=HatModel)
 
 
-class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
+class _HatRecord(_BaseApiModel, _BaseHatModel, GenericModel, Generic[M]):
     data: dict[str, Any] = {}
 
     @classmethod
@@ -108,11 +108,11 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
         return dump(records)
 
     @classmethod
-    def _from_model(cls, model: M) -> "HatRecord[M]":
+    def _from_model(cls, model: M) -> "_HatRecord[M]":
         return cls(
             endpoint=model.endpoint,
             record_id=model.record_id,
-            data=model.dict(exclude=set(BaseHatModel.__fields__)),
+            data=model.dict(exclude=set(_BaseHatModel.__fields__)),
         )
 
 
@@ -121,7 +121,7 @@ class Ordering(str, Enum):
     DESCENDING = "descending"
 
 
-class GetOpts(BaseApiModel):
+class GetOpts(_BaseApiModel):
     order_by: Optional[constr(min_length=1)]
     ordering: Optional[Ordering]
     skip: Optional[NonNegativeInt]
@@ -139,7 +139,7 @@ class JwtToken(BaseModel):
     iat: PositiveInt
     iss: constr(regex=r"^\w+\.hubat\.net$", strict=True)  # noqa: F722
 
-    Config = ApiConfig
+    Config = _ApiConfig
 
     @classmethod
     def decode(
@@ -152,7 +152,7 @@ class JwtToken(BaseModel):
     ) -> Union[dict, "JwtToken"]:
         if verify and pk is None:
             raise ValueError("'pk' is required if 'verify' is True")
-        if JWT_PATTERN.match(encoded) is None:
+        if _JWT_PATTERN.match(encoded) is None:
             raise ValueError(f"'encoded' has improper syntax:\n{encoded}")
         try:
             payload = jwt.decode(

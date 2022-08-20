@@ -7,49 +7,49 @@ from json import JSONDecodeError
 from typing import Any
 from typing import Callable
 from typing import ClassVar
+from typing import TypeVar
 from typing import cast
 
 from keyring.credentials import Credential
 
-from . import urls
-from . import utils
-from .base import SYNC_CACHING_ENABLED
-from .base import SYNC_ENABLED
-from .base import SYNC_IMPORT_ERROR_MSG
-from .base import TOKEN_HEADER
-from .base import TOKEN_KEY
-from .base import A
-from .base import BaseActiveHatModel
-from .base import BaseApiToken
-from .base import BaseHatClient
-from .base import BaseHttpClient
-from .base import BaseResponse
-from .base import BaseResponseError
-from .base import BaseResponseHandler
-from .base import Cacheable
-from .base import Closeable
-from .base import HttpAuth
-from .base import IStringLike
-from .base import Models
-from .base import StringLike
+from . import _urls
+from . import _utils
+from ._base import SYNC_CACHING_ENABLED
+from ._base import SYNC_ENABLED
+from ._base import SYNC_IMPORT_ERROR_MSG
+from ._base import TOKEN_HEADER
+from ._base import TOKEN_KEY
+from ._base import BaseActiveHatModel
+from ._base import BaseApiToken
+from ._base import BaseHatClient
+from ._base import BaseHttpClient
+from ._base import BaseResponse
+from ._base import BaseResponseError
+from ._base import BaseResponseHandler
+from ._base import Cacheable
+from ._base import Closeable
+from ._base import HttpAuth
+from ._base import IStringLike
+from ._base import Models
+from ._base import StringLike
 from .model import GetOpts
 from .model import HatModel
-from .model import HatRecord
 from .model import JwtAppToken
 from .model import JwtOwnerToken
 from .model import JwtToken
 from .model import M
+from .model import _HatRecord
 
 
 if SYNC_ENABLED:
-    from .base import ClientResponse
-    from .base import ClientResponseError
-    from .base import ClientSession
+    from ._base import ClientResponse
+    from ._base import ClientResponseError
+    from ._base import ClientSession
 else:
     raise ImportError(SYNC_IMPORT_ERROR_MSG)
 
 if SYNC_CACHING_ENABLED:
-    from .base import CachedSession
+    from ._base import CachedSession
 
 
 class Response(BaseResponse):
@@ -92,7 +92,7 @@ class ResponseError(BaseResponseError):
 
     def content(self) -> dict[str, str] | str:
         try:
-            return utils.loads(self._response.content)
+            return _utils.loads(self._response.content)
         except JSONDecodeError:
             return self._response.text
 
@@ -103,14 +103,14 @@ class ResponseError(BaseResponseError):
 class ResponseHandler(BaseResponseHandler):
     def on_success(self, response: Response, **kwargs) -> str | list[M] | None:
         url = response.url()
-        if urls.is_pk_endpoint(url):
+        if _urls.is_pk_endpoint(url):
             return response.text()
-        elif urls.is_token_endpoint(url):
-            return utils.loads(response.text())[TOKEN_KEY]
+        elif _urls.is_token_endpoint(url):
+            return _utils.loads(response.text())[TOKEN_KEY]
         elif response.method() == "delete":
             return None
-        elif urls.is_api_endpoint(url):
-            return HatRecord.parse(response.raw(), kwargs["mtypes"])
+        elif _urls.is_api_endpoint(url):
+            return _HatRecord.parse(response.raw(), kwargs["mtypes"])
         else:
             return super()._success_handling_failed(response)
 
@@ -183,7 +183,7 @@ class ApiToken(BaseApiToken, abc.ABC):
 
     def pk(self) -> str:
         if self._pk is None:
-            url = urls.domain_pk(self.domain())
+            url = _urls.domain_pk(self.domain())
             self._pk = self._get(url)
         return self._pk
 
@@ -202,7 +202,7 @@ class ApiToken(BaseApiToken, abc.ABC):
     def domain(self) -> str:
         if self._domain is None:
             token = self.decode(verify=False)
-            self._domain = urls.with_scheme(token.iss)
+            self._domain = _urls.with_scheme(token.iss)
         return self._domain
 
     def decode(self, *, verify: bool = True) -> JwtToken:
@@ -223,7 +223,7 @@ class CredentialOwnerToken(ApiToken):
 
     def __init__(self, http_client: HttpClient, credential: Credential) -> None:
         super().__init__(http_client, CredentialAuth(credential), JwtOwnerToken)
-        self._url = urls.username_owner_token(credential.username)
+        self._url = _urls.username_owner_token(credential.username)
 
     def url(self) -> str:
         return self._url
@@ -249,7 +249,7 @@ class AppToken(ApiToken):
 
     def url(self) -> str:
         if self._url is None:
-            self._url = urls.domain_app_token(self.domain(), self._app_id)
+            self._url = _urls.domain_app_token(self.domain(), self._app_id)
         return self._url
 
 
@@ -335,11 +335,11 @@ class HatClient(BaseHatClient, Cacheable, Closeable, AbstractContextManager):
         return cast(HttpClient, self._http)
 
     def _endpoint_request(self, method: str, endpoint: str, **kwargs) -> list[M]:
-        url = urls.domain_endpoint(self._token.domain(), self._namespace, endpoint)
+        url = _urls.domain_endpoint(self._token.domain(), self._namespace, endpoint)
         return self._request(method, url, **kwargs)
 
     def _data_request(self, method: str, **kwargs) -> list[M] | None:
-        url = urls.domain_data(self._token.domain())
+        url = _urls.domain_data(self._token.domain())
         return self._request(method, url, **kwargs)
 
     def _request(self, method: str, url: str, **kwargs) -> list[M] | None:
@@ -349,12 +349,29 @@ class HatClient(BaseHatClient, Cacheable, Closeable, AbstractContextManager):
 class ActiveHatModel(BaseActiveHatModel):
     client: ClassVar[HatClient]
 
-    def _save(self, try_first: Callable, has_id: bool) -> A:
+    def _save(self, try_first: Callable, has_id: bool) -> S:
         return super()._save(try_first, has_id)
+
+    def save(self, endpoint: str | None = None) -> S:
+        return super().save(endpoint)
+
+    def delete(self) -> None:
+        return super().delete()
+
+    @classmethod
+    def delete_all(cls, record_ids: StringLike | IStringLike) -> None:
+        return super().delete_all(record_ids)
+
+    @classmethod
+    def get(cls, endpoint: StringLike, options: GetOpts | None = None) -> list[S]:
+        return super().get(endpoint, options)
 
     @classmethod
     def _client(cls) -> HatClient:
         return cls.client
+
+
+S = TypeVar("S", bound=ActiveHatModel)
 
 
 def set_client(client: HatClient) -> None:

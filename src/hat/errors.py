@@ -45,9 +45,9 @@ class MalformedBodyError(PutError):
     pass
 
 
-# It is not officially documented, but it appears that updating (PUT) a record
-# to have the same data as another existing record is also not allowed.
 class DuplicateDataError(PostError, PutError):
+    # It is not officially documented, but it appears that updating (PUT) a record
+    # to have the same data as another existing record is also not allowed.
     pass
 
 
@@ -71,44 +71,44 @@ class UnsupportedMediaTypeError(PostError, PutError):
     pass
 
 
-E = TypeVar("E", bound=Exception)
-Resolver = Callable[[Any], Type[E]]
-V = tuple[Optional[Type[E]], Optional[Resolver]]
+_E = TypeVar("_E", bound=Exception)
+_Resolver = Callable[[Any], Type[_E]]
+_V = tuple[Optional[Type[_E]], Optional[_Resolver]]
 
 
-class ErrorMapping(Generic[E]):
+class _ErrorMapping(Generic[_E]):
     __slots__ = "_default", "_errors"
 
-    def __init__(self, default: type[E]):
+    def __init__(self, default: type[_E]):
         self._default = default
         self._errors = self._new_map(default)
 
     @staticmethod
-    def _new_map(default: type[E]) -> dict[int, V]:
+    def _new_map(default: type[_E]) -> dict[int, _V]:
         return collections.defaultdict(lambda: (default, None))
 
-    def get(self, status: int, content: Any) -> type[E]:
+    def get(self, status: int, content: Any) -> type[_E]:
         error, resolver = self._errors[status]
         return error if resolver is None else resolver(content)
 
     def put(
         self,
         status: int,
-        error: type[E] | None = None,
-        resolver: Resolver | None = None,
+        error: type[_E] | None = None,
+        resolver: _Resolver | None = None,
     ) -> None:
         if not (error is None) ^ (resolver is None):
             raise ValueError("Either 'error' or 'resolver' must be specified")
         self._errors[status] = (error, resolver)
 
-    def update(self, mapping: ErrorMapping) -> None:
+    def update(self, mapping: _ErrorMapping) -> None:
         self._errors.update(mapping._errors)
 
-    def default(self) -> type[E]:
+    def default(self) -> type[_E]:
         return self._default
 
 
-def resolve_put_400(content: dict[str, str] | str) -> type[PutError]:
+def _resolve_put_400(content: dict[str, str] | str) -> type[PutError]:
     if isinstance(content, dict):
         if isinstance(content["message"], str):
             error = MalformedBodyError
@@ -119,46 +119,46 @@ def resolve_put_400(content: dict[str, str] | str) -> type[PutError]:
     return error
 
 
-possible_codes = (400, 401, 403, 404, 415, 500)
+POSSIBLE_CODES = (400, 401, 403, 404, 415, 500)
 
-auth_errors = ErrorMapping(AuthError)
-auth_errors.put(401, WrongCredentialsError)
-auth_errors.put(404, HatNotFoundError)
+_auth_errors = _ErrorMapping(AuthError)
+_auth_errors.put(401, WrongCredentialsError)
+_auth_errors.put(404, HatNotFoundError)
 
-crud_errors = ErrorMapping(HatError)
-crud_errors.put(401, WrongTokenError)
-crud_errors.put(403, LimitedTokenScopeError)
+_crud_errors = _ErrorMapping(HatError)
+_crud_errors.put(401, WrongTokenError)
+_crud_errors.put(403, LimitedTokenScopeError)
 
-get_errors = ErrorMapping(GetError)
-get_errors.update(crud_errors)
+_get_errors = _ErrorMapping(GetError)
+_get_errors.update(_crud_errors)
 
-post_errors = ErrorMapping(PostError)
-post_errors.update(crud_errors)
-post_errors.put(415, UnsupportedMediaTypeError)
-post_errors.put(400, DuplicateDataError)
+_post_errors = _ErrorMapping(PostError)
+_post_errors.update(_crud_errors)
+_post_errors.put(415, UnsupportedMediaTypeError)
+_post_errors.put(400, DuplicateDataError)
 
-put_errors = ErrorMapping(PutError)
-put_errors.update(crud_errors)
-put_errors.put(400, resolver=resolve_put_400)
-put_errors.put(415, UnsupportedMediaTypeError)
-put_errors.put(500, DuplicateDataError)
+_put_errors = _ErrorMapping(PutError)
+_put_errors.update(_crud_errors)
+_put_errors.put(400, resolver=_resolve_put_400)
+_put_errors.put(415, UnsupportedMediaTypeError)
+_put_errors.put(500, DuplicateDataError)
 
-delete_errors = ErrorMapping(DeleteError)
-delete_errors.update(crud_errors)
-delete_errors.put(400, RecordNotFoundError)
+_delete_errors = _ErrorMapping(DeleteError)
+_delete_errors.update(_crud_errors)
+_delete_errors.put(400, RecordNotFoundError)
 
-errors: dict[str, ErrorMapping] = {
-    "auth": auth_errors,
-    "get": get_errors,
-    "post": post_errors,
-    "put": put_errors,
-    "delete": delete_errors,
+_errors: dict[str, _ErrorMapping] = {
+    "auth": _auth_errors,
+    "get": _get_errors,
+    "post": _post_errors,
+    "put": _put_errors,
+    "delete": _delete_errors,
 }
 
 
 def find_error(kind: str, status: int, content: Any) -> type[HatError]:
     key = kind.lower().strip()
-    if key in errors:
-        return errors[key].get(status, content)
+    if key in _errors:
+        return _errors[key].get(status, content)
     else:
-        raise ValueError(f"'kind' must be one of {list(errors.keys())}; got {kind}")
+        raise ValueError(f"'kind' must be one of {list(_errors.keys())}; got {kind}")

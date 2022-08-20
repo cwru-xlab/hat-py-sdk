@@ -5,56 +5,55 @@ import asyncio
 import mimetypes
 from contextlib import AbstractAsyncContextManager
 from typing import Any
-from typing import Awaitable
 from typing import Callable
 from typing import ClassVar
 from typing import Iterable
 from typing import Mapping
+from typing import TypeVar
 from typing import cast
 
 from keyring.credentials import Credential
 
+from . import _urls
+from . import _utils
 from . import errors
-from . import urls
-from . import utils
-from .base import ASYNC_CACHING_ENABLED
-from .base import ASYNC_ENABLED
-from .base import ASYNC_IMPORT_ERROR_MSG
-from .base import TOKEN_HEADER
-from .base import TOKEN_KEY
-from .base import A
-from .base import AsyncCacheable
-from .base import AsyncCloseable
-from .base import AsyncHttpAuth
-from .base import BaseActiveHatModel
-from .base import BaseApiToken
-from .base import BaseHatClient
-from .base import BaseHttpClient
-from .base import BaseResponse
-from .base import BaseResponseError
-from .base import BaseResponseHandler
-from .base import HttpAuth
-from .base import IStringLike
-from .base import Models
-from .base import StringLike
+from ._base import ASYNC_CACHING_ENABLED
+from ._base import ASYNC_ENABLED
+from ._base import ASYNC_IMPORT_ERROR_MSG
+from ._base import TOKEN_HEADER
+from ._base import TOKEN_KEY
+from ._base import AsyncCacheable
+from ._base import AsyncCloseable
+from ._base import AsyncHttpAuth
+from ._base import BaseActiveHatModel
+from ._base import BaseApiToken
+from ._base import BaseHatClient
+from ._base import BaseHttpClient
+from ._base import BaseResponse
+from ._base import BaseResponseError
+from ._base import BaseResponseHandler
+from ._base import HttpAuth
+from ._base import IStringLike
+from ._base import Models
+from ._base import StringLike
 from .model import GetOpts
 from .model import HatModel
-from .model import HatRecord
 from .model import JwtAppToken
 from .model import JwtOwnerToken
 from .model import JwtToken
 from .model import M
+from .model import _HatRecord
 
 
 if ASYNC_ENABLED:
-    from .base import AsyncClientResponse
-    from .base import AsyncClientResponseError
-    from .base import AsyncClientSession
+    from ._base import AsyncClientResponse
+    from ._base import AsyncClientResponseError
+    from ._base import AsyncClientSession
 else:
     raise ImportError(ASYNC_IMPORT_ERROR_MSG)
 
 if ASYNC_CACHING_ENABLED:
-    from .base import AsyncCachedSession
+    from ._base import AsyncCachedSession
 
 
 class AsyncResponse(BaseResponse):
@@ -109,14 +108,14 @@ class AsyncResponseHandler(BaseResponseHandler):
         self, response: AsyncResponse, **kwargs
     ) -> str | list[M] | None:
         url = response.url()
-        if urls.is_pk_endpoint(url):
+        if _urls.is_pk_endpoint(url):
             return await response.text()
-        elif urls.is_token_endpoint(url):
-            return utils.loads(await response.text())[TOKEN_KEY]
+        elif _urls.is_token_endpoint(url):
+            return _utils.loads(await response.text())[TOKEN_KEY]
         elif response.method() == "delete":
             return None
-        elif urls.is_api_endpoint(url):
-            return HatRecord.parse(await response.raw(), kwargs["mtypes"])
+        elif _urls.is_api_endpoint(url):
+            return _HatRecord.parse(await response.raw(), kwargs["mtypes"])
         else:
             return super()._success_handling_failed(response)
 
@@ -194,7 +193,7 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
 
     async def pk(self) -> str:
         if self._pk is None:
-            url = urls.domain_pk(await self.domain())
+            url = _urls.domain_pk(await self.domain())
             self._pk = await self._get(url)
         return self._pk
 
@@ -213,7 +212,7 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
     async def domain(self) -> str:
         if self._domain is None:
             token = await self.decode(verify=False)
-            self._domain = urls.with_scheme(token.iss)
+            self._domain = _urls.with_scheme(token.iss)
         return self._domain
 
     async def decode(self, *, verify: bool = True) -> JwtToken:
@@ -234,7 +233,7 @@ class AsyncCredentialOwnerToken(AsyncApiToken):
 
     def __init__(self, http_client: AsyncHttpClient, credential: Credential) -> None:
         super().__init__(http_client, AsyncCredentialAuth(credential), JwtOwnerToken)
-        self._url = urls.username_owner_token(credential.username)
+        self._url = _urls.username_owner_token(credential.username)
 
     async def url(self) -> str:
         return self._url
@@ -260,7 +259,7 @@ class AsyncAppToken(AsyncApiToken):
 
     async def url(self) -> str:
         if self._url is None:
-            self._url = urls.domain_app_token(await self.domain(), self._app_id)
+            self._url = _urls.domain_app_token(await self.domain(), self._app_id)
         return self._url
 
 
@@ -332,13 +331,13 @@ class AsyncHatClient(
         return await super().delete(record_ids)
 
     async def _endpoint_request(self, method: str, endpoint: str, **kwargs) -> list[M]:
-        url = urls.domain_endpoint(
+        url = _urls.domain_endpoint(
             await self.token().domain(), self._namespace, endpoint
         )
         return await self._request(method, url, **kwargs)
 
     async def _data_request(self, method: str, **kwargs) -> list[M] | None:
-        url = urls.domain_data(await self.token().domain())
+        url = _urls.domain_data(await self.token().domain())
         return await self._request(method, url, **kwargs)
 
     async def _request(self, method: str, url: str, **kwargs) -> list[M] | None:
@@ -370,7 +369,7 @@ class AsyncActiveHatModel(BaseActiveHatModel):
     async def save(self, endpoint: str | None = None) -> A:
         return await super().save(endpoint)
 
-    async def _save(self, try_first: Callable, has_id: bool) -> A | Awaitable[A] | None:
+    async def _save(self, try_first: Callable, has_id: bool) -> A:
         try:
             saved = await try_first(self)
         except errors.PutError as error:
@@ -394,6 +393,9 @@ class AsyncActiveHatModel(BaseActiveHatModel):
     @classmethod
     def _client(cls) -> AsyncHatClient:
         return cls.client
+
+
+A = TypeVar("A", bound=AsyncActiveHatModel)
 
 
 def set_async_client(client: AsyncHatClient) -> None:
