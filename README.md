@@ -32,19 +32,19 @@ Unofficial Python SDK for the [Dataswift API](https://api.dataswift.io/).
 ### Domain modeling
 
 Top-level domain objects should inherit from `HatModel`, which is a special kind
-of pydantic `BaseModel`. All other domain objects can be either be
-pydantic `BaseModel` instances or any other kind of JSON-serializable object.
-A `HatModel` has a record ID and an endpoint that relate to the Dataswift API.
-The record ID uniquely identifies the record in the PDA. The endpoint is a path
-that describes where in the PDA the record is located. In this way, a PDA is
-like an object database (e.g., Amazon S3) where all the objects are accessible
-via the endpoint at which they are located. A PDA is also like a document
-database in that each record stored at an endpoint can be arbitrary JSON.
+of pydantic `BaseModel`. All other domain objects can be either pydantic
+`BaseModel` instances or any other kind of JSON-serializable object. A
+`HatModel` has a record ID and an endpoint that relate to the Dataswift API. The
+record ID uniquely identifies the record in the PDA. The endpoint is a path that
+describes where in the PDA the record is located. In this way, a PDA is like an
+object database (e.g., Amazon S3) where all the objects are accessible via the
+endpoint at which they are located. A PDA is also like a document database in
+that each record stored at an endpoint can be arbitrary JSON.
 
 **Note:** This SDK assumes that each endpoint contains homogenous data
 (i.e., all records have the same JSON schema). The `HatModel` allows for
-arbitrary fields, so it is possible to retrieve any JSON from an endpoint, but
-fields that represent JSON objects will remain as Python `dict`s.
+arbitrary fields, so it is possible to retrieve any JSON record from an
+endpoint, but fields that represent JSON objects will remain as Python `dict`s.
 
 ```python
 from pydantic import BaseModel
@@ -224,6 +224,7 @@ model.value += 1
 await model.save()
 # ...or delete the model.
 await model.delete()
+
 # It is also possible to delete multiple records...
 await MyModel.delete_all(HatModel(record_id="record_id"), ...)
 # ...or just with the record IDs.
