@@ -16,6 +16,8 @@ from . import utils
 from .base import SYNC_CACHING_ENABLED
 from .base import SYNC_ENABLED
 from .base import SYNC_IMPORT_ERROR_MSG
+from .base import TOKEN_HEADER
+from .base import TOKEN_KEY
 from .base import A
 from .base import BaseActiveHatModel
 from .base import BaseApiToken
@@ -30,8 +32,6 @@ from .base import HttpAuth
 from .base import IStringLike
 from .base import Models
 from .base import StringLike
-from .model import TOKEN_HEADER
-from .model import TOKEN_KEY
 from .model import GetOpts
 from .model import HatModel
 from .model import HatRecord
@@ -82,22 +82,22 @@ class ResponseError(BaseResponseError):
 
     def __init__(self, wrapped: ClientResponseError) -> None:
         super().__init__(wrapped)
-        self._wrapped = wrapped.response
+        self._response = wrapped.response
 
     def method(self) -> str:
-        return self._wrapped.request.method.lower()
+        return self._response.request.method.lower()
 
     def url(self) -> str:
-        return self._wrapped.url
+        return self._response.url
 
     def content(self) -> dict[str, str] | str:
         try:
-            return utils.loads(self._wrapped.content)
+            return utils.loads(self._response.content)
         except JSONDecodeError:
-            return self._wrapped.text
+            return self._response.text
 
     def status(self) -> int:
-        return self._wrapped.status_code
+        return self._response.status_code
 
 
 class ResponseHandler(BaseResponseHandler):

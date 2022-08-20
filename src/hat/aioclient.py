@@ -20,6 +20,8 @@ from . import utils
 from .base import ASYNC_CACHING_ENABLED
 from .base import ASYNC_ENABLED
 from .base import ASYNC_IMPORT_ERROR_MSG
+from .base import TOKEN_HEADER
+from .base import TOKEN_KEY
 from .base import A
 from .base import AsyncCacheable
 from .base import AsyncCloseable
@@ -35,8 +37,6 @@ from .base import HttpAuth
 from .base import IStringLike
 from .base import Models
 from .base import StringLike
-from .model import TOKEN_HEADER
-from .model import TOKEN_KEY
 from .model import GetOpts
 from .model import HatModel
 from .model import HatRecord
@@ -96,7 +96,9 @@ class AsyncResponseError(BaseResponseError):
         return str(self._wrapped.request_info.url)
 
     def content(self) -> str:
-        return f"{self.status} Error: {self.url}"
+        status = self.status()
+        kind = "Client" if 400 <= status < 500 else "Server"
+        return f"{status} {kind} Error: {self.url}"
 
     def status(self) -> int:
         return self._wrapped.status

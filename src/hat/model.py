@@ -28,8 +28,6 @@ from . import utils
 
 
 JWT_PATTERN = re.compile(r"^(?:[\w-]*\.){2}[\w-]*$")
-TOKEN_KEY = "accessToken"
-TOKEN_HEADER = "x-auth-token"
 
 
 class HatConfig(BaseConfig):

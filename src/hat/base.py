@@ -70,6 +70,9 @@ except ImportError:
 SYNC_IMPORT_ERROR_MSG = "Must install package with 'sync' option"
 ASYNC_IMPORT_ERROR_MSG = "Must install package with 'async' option"
 
+TOKEN_KEY = "accessToken"
+TOKEN_HEADER = "x-auth-token"
+
 NEVER_CACHE = 0
 SESSION_DEFAULTS = {
     "headers": {"Content-Type": mimetypes.types_map[".json"]},
@@ -82,10 +85,9 @@ SESSION_DEFAULTS = {
     },
     "stream": True,
 }
-
+# requests-cache and asyncio-client-cache use slightly different naming.
 SESSION_DEFAULTS["allowable_codes"] = SESSION_DEFAULTS["allowed_codes"]
 SESSION_DEFAULTS["allowable_methods"] = SESSION_DEFAULTS["allowed_methods"]
-
 
 Models = Union[M, Iterator[M], Collection[M]]
 StringLike = Union[str, HatModel]
