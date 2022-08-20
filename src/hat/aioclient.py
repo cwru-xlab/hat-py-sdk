@@ -173,7 +173,7 @@ class AsyncHttpClient(
 
     async def clear_cache(self) -> None:
         if ASYNC_CACHING_ENABLED and isinstance(self._session, AsyncCachedSession):
-            return await self._session.close()
+            return await self._session.cache.clear()
 
     def _is_async(self) -> bool:
         return True

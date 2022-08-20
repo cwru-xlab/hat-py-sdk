@@ -162,7 +162,7 @@ class HttpClient(BaseHttpClient, Cacheable, Closeable, AbstractContextManager):
 
     def clear_cache(self) -> None:
         if SYNC_CACHING_ENABLED and isinstance(self._session, CachedSession):
-            return self._session.close()
+            return self._session.cache.clear()
 
     def _is_async(self) -> bool:
         return False
