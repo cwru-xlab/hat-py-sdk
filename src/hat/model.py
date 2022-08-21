@@ -35,16 +35,12 @@ class HatConfig(BaseConfig):
     use_enum_values = True
     json_dumps = utils.dumps
     json_loads = utils.loads
-    underscore_attrs_are_private = True
-
-
-class ApiConfig(HatConfig):
-    alias_generator = camel.case
-    allow_mutation = False
 
 
 class BaseApiModel(BaseModel, ABC):
-    Config = ApiConfig
+    class Config(HatConfig):
+        alias_generator = camel.case
+        allow_mutation = False
 
     def dict(self, by_alias: bool = True, **kwargs) -> dict[str, Any]:
         return super().dict(by_alias=by_alias, **kwargs)
@@ -134,12 +130,10 @@ class GetOpts(BaseApiModel):
         return super().json(exclude_none=exclude_none, **kwargs)
 
 
-class JwtToken(BaseModel):
+class JwtToken(BaseApiModel):
     exp: PositiveInt
     iat: PositiveInt
     iss: constr(regex=r"^\w+\.hubat\.net$", strict=True)  # noqa: F722
-
-    Config = ApiConfig
 
     @classmethod
     def decode(

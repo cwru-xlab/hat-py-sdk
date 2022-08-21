@@ -199,7 +199,7 @@ class BaseResponseHandler(abc.ABC):
             wrapper = errors.find_error(error.method(), error.status(), error.content())
         else:
             wrapper, error = error, None
-        raise wrapper(error)
+        raise wrapper from error
 
 
 class Cacheable:
