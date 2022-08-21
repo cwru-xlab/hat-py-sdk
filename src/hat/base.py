@@ -115,14 +115,14 @@ def ensure_iterable(method: Callable) -> Callable:
     return wrapper
 
 
-def require_endpoint(strings: IStringLike) -> Iterator[StringLike]:
+def ensure_endpoint(strings: IStringLike) -> Iterator[StringLike]:
     for s in strings:
         if hasattr(s, "endpoint") and s.endpoint is None:
             raise ValueError("'endpoint' is required")
         yield s
 
 
-def require_record_id(strings: IStringLike) -> Iterator[StringLike]:
+def ensure_record_id(strings: IStringLike) -> Iterator[StringLike]:
     for s in strings:
         if hasattr(s, "record_id") and s.record_id is None:
             raise ValueError("'record_id' is required")
@@ -210,10 +210,8 @@ class Cacheable:
 
 
 class AsyncCacheable(Cacheable):
-    __slots__ = ()
-
     async def clear_cache(self) -> None:
-        pass
+        return super().clear_cache()
 
 
 class Closeable:
@@ -225,7 +223,7 @@ class Closeable:
 
 class AsyncCloseable(Closeable):
     async def close(self) -> None:
-        pass
+        return super().close()
 
 
 class HttpAuth:
@@ -444,37 +442,36 @@ class BaseHatClient(abc.ABC):
 
     @staticmethod
     def _prepare_get(string: StringLike) -> str:
-        string = next(require_endpoint([string]))
+        string = next(ensure_endpoint([string]))
         return string if isinstance(string, str) else string.endpoint
 
     def _prepare_post(self, models: Iterable[M]) -> Iterable[tuple]:
         formatted = []
-        for m in require_endpoint(models):
+        for model in ensure_endpoint(models):
             # The namespace is added when constructing the endpoint URL, so it should
             # not be a part of the endpoint here.
-            if self._pattern.match(m.endpoint):
-                m.endpoint = self._pattern.split(m.endpoint)[-1]
-            formatted.append(m)
+            if self._pattern.match(model.endpoint):
+                model.endpoint = self._pattern.split(model.endpoint)[-1]
+            formatted.append(model)
         for endpoint, models in group_by_endpoint(formatted):
             records = HatRecord.to_json(models, data_only=True)
             yield endpoint, records, map(type, models)
 
     def _prepare_put(self, models: Iterable[M]) -> tuple[str, Iterable[type]]:
         formatted = []
-        for m in require_endpoint(models):
+        for model in ensure_endpoint(models):
             # The endpoint should include the namespace. BaseHatModels created from
             # responses will include the namespace. This is just a convenience if
             # wanting to create them manually.
-            if self._pattern.match(m.endpoint) is None:
-                m.endpoint = f"{self._namespace}/{m.endpoint}"
-            formatted.append(m)
+            if self._pattern.match(model.endpoint) is None:
+                model.endpoint = f"{self._namespace}/{model.endpoint}"
+            formatted.append(model)
         return HatRecord.to_json(formatted), map(type, models)
 
     @staticmethod
-    def _prepare_delete(record_ids: IStringLike) -> dict[str, list[str]]:
+    def _prepare_delete(strings: IStringLike) -> dict[str, list[str]]:
         record_ids = [
-            r if isinstance(r, str) else r.record_id
-            for r in require_record_id(record_ids)
+            s if isinstance(s, str) else s.record_id for s in ensure_record_id(strings)
         ]
         return {"records": record_ids}
 
