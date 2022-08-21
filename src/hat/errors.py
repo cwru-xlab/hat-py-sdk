@@ -71,31 +71,31 @@ class UnsupportedMediaTypeError(PostError, PutError):
     pass
 
 
-_E = TypeVar("_E", bound=Exception)
-_Resolver = Callable[[Any], Type[_E]]
-_V = tuple[Optional[Type[_E]], Optional[_Resolver]]
+E = TypeVar("E", bound=Exception)
+Resolver = Callable[[Any], Type[E]]
+V = tuple[Optional[Type[E]], Optional[Resolver]]
 
 
-class ErrorMapping(Generic[_E]):
+class ErrorMapping(Generic[E]):
     __slots__ = "_default", "_errors"
 
-    def __init__(self, default: type[_E]):
+    def __init__(self, default: type[E]):
         self._default = default
         self._errors = self._new_map(default)
 
     @staticmethod
-    def _new_map(default: type[_E]) -> dict[int, _V]:
+    def _new_map(default: type[E]) -> dict[int, V]:
         return collections.defaultdict(lambda: (default, None))
 
-    def get(self, status: int, content: Any) -> type[_E]:
+    def get(self, status: int, content: Any) -> type[E]:
         error, resolver = self._errors[status]
         return error if resolver is None else resolver(content)
 
     def put(
         self,
         status: int,
-        error: type[_E] | None = None,
-        resolver: _Resolver | None = None,
+        error: type[E] | None = None,
+        resolver: Resolver | None = None,
     ) -> None:
         if not (error is None) ^ (resolver is None):
             raise ValueError("Either 'error' or 'resolver' must be specified")
@@ -104,7 +104,7 @@ class ErrorMapping(Generic[_E]):
     def update(self, mapping: ErrorMapping) -> None:
         self._errors.update(mapping._errors)
 
-    def default(self) -> type[_E]:
+    def default(self) -> type[E]:
         return self._default
 
 
