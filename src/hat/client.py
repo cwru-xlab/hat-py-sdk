@@ -124,8 +124,8 @@ class ResponseHandler(BaseResponseHandler):
 class HttpClient(BaseHttpClient, Cacheable, Closeable, AbstractContextManager):
     def __init__(
         self,
-        session: Any | None = None,
-        handler: BaseResponseHandler | None = None,
+        session: ClientSession | None = None,
+        handler: ResponseHandler | None = None,
         auth: HttpAuth | None = None,
         **kwargs,
     ) -> None:

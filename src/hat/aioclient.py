@@ -137,9 +137,9 @@ class AsyncHttpClient(
 ):
     def __init__(
         self,
-        session: Any | None = None,
-        handler: BaseResponseHandler | None = None,
-        auth: HttpAuth | None = None,
+        session: AsyncClientSession | None = None,
+        handler: AsyncResponseHandler | None = None,
+        auth: AsyncHttpAuth | None = None,
         **kwargs,
     ) -> None:
         super().__init__(session, handler, auth, **kwargs)
