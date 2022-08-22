@@ -9,7 +9,6 @@ from typing import Awaitable
 from typing import Callable
 from typing import ClassVar
 from typing import Iterable
-from typing import Mapping
 from typing import TypeVar
 from typing import cast
 
@@ -37,7 +36,6 @@ from .base import BaseResponse
 from .base import BaseResponseError
 from .base import BaseResponseHandler
 from .base import BaseTokenAuth
-from .base import HttpAuth
 from .base import IStringLike
 from .base import Models
 from .base import StringLike
@@ -167,9 +165,9 @@ class AsyncHttpClient(
         url: str,
         *,
         auth: AsyncHttpAuth | None = None,
-        headers: Mapping[str, str] | None = None,
+        headers: dict[str, str] | None = None,
         data: Any = None,
-        params: Mapping[str, str] | None = None,
+        params: dict[str, str] | None = None,
         **kwargs,
     ) -> Any:
         auth = auth or self._auth
@@ -205,7 +203,10 @@ class AsyncHttpClient(
 
 class AsyncApiToken(BaseApiToken, abc.ABC):
     def __init__(
-        self, http_client: BaseHttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
+        self,
+        http_client: AsyncHttpClient,
+        auth: AsyncHttpAuth,
+        jwt_type: type[JwtToken],
     ) -> None:
         super().__init__(http_client, auth, jwt_type)
 
