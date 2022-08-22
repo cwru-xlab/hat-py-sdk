@@ -134,8 +134,8 @@ get_errors.update(crud_errors)
 
 post_errors = ErrorMapping(PostError)
 post_errors.update(crud_errors)
-post_errors.put(415, UnsupportedMediaTypeError)
 post_errors.put(400, DuplicateDataError)
+post_errors.put(415, UnsupportedMediaTypeError)
 
 put_errors = ErrorMapping(PutError)
 put_errors.update(crud_errors)
