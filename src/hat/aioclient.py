@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import inspect
 import mimetypes
 from contextlib import AbstractAsyncContextManager
 from typing import Any
@@ -20,6 +21,8 @@ from . import utils
 from .base import ASYNC_CACHING_ENABLED
 from .base import ASYNC_ENABLED
 from .base import ASYNC_IMPORT_ERROR_MSG
+from .base import CACHE_KWD
+from .base import SESSION_DEFAULTS
 from .base import TOKEN_HEADER
 from .base import TOKEN_KEY
 from .base import AsyncCacheable
@@ -53,6 +56,7 @@ else:
     raise ImportError(ASYNC_IMPORT_ERROR_MSG)
 
 if ASYNC_CACHING_ENABLED:
+    from .base import AsyncCacheBackend
     from .base import AsyncCachedSession
 
 
@@ -128,16 +132,28 @@ class AsyncHttpClient(
 ):
     def __init__(
         self,
-        session: AsyncClientSession | None = None,
-        auth: AsyncHttpAuth | None = None,
+        session: Any | None = None,
+        handler: BaseResponseHandler | None = None,
+        auth: HttpAuth | None = None,
         **kwargs,
     ) -> None:
-        super().__init__(session, auth, **kwargs)
+        super().__init__(session, handler, auth, **kwargs)
 
-    def _new_handler(self) -> AsyncResponseHandler:
+    def _new_session(self, **kwargs) -> AsyncClientSession:
+        kwargs = SESSION_DEFAULTS | kwargs
+        if ASYNC_CACHING_ENABLED:
+            cache = kwargs.pop(CACHE_KWD, None) or AsyncCacheBackend(**kwargs)
+            session = AsyncCachedSession(cache=cache, **kwargs)
+        else:
+            params = inspect.signature(AsyncClientSession.__init__).parameters
+            kwargs = {k: v for k, v in kwargs.items() if k in params}
+            session = AsyncClientSession(**kwargs)
+        return session
+
+    def _new_handler(self, **kwargs) -> AsyncResponseHandler:
         return AsyncResponseHandler()
 
-    def _new_auth(self) -> AsyncHttpAuth:
+    def _new_auth(self, **kwargs) -> AsyncHttpAuth:
         return AsyncHttpAuth()
 
     async def request(
@@ -173,9 +189,6 @@ class AsyncHttpClient(
     async def clear_cache(self) -> None:
         if ASYNC_CACHING_ENABLED and isinstance(self._session, AsyncCachedSession):
             return await self._session.cache.clear()
-
-    def _is_async(self) -> bool:
-        return True
 
     async def __aenter__(self) -> AsyncHttpClient:
         await self._session.__aenter__()

@@ -3,7 +3,6 @@ from __future__ import annotations
 import abc
 import datetime
 import functools
-import inspect
 import itertools
 import mimetypes
 import pprint
@@ -85,6 +84,7 @@ SESSION_DEFAULTS = {
 # requests-cache and asyncio-client-cache use slightly different naming.
 SESSION_DEFAULTS["allowable_codes"] = SESSION_DEFAULTS["allowed_codes"]
 SESSION_DEFAULTS["allowable_methods"] = SESSION_DEFAULTS["allowed_methods"]
+CACHE_KWD = "cache"
 
 TOKEN_KEY = "accessToken"
 TOKEN_HEADER = "x-auth-token"
@@ -250,44 +250,25 @@ class BaseHttpClient(abc.ABC):
     def __init__(
         self,
         session: Any | None = None,
+        handler: BaseResponseHandler | None = None,
         auth: HttpAuth | None = None,
         **kwargs,
     ) -> None:
         self._session = session or self._new_session(**kwargs)
-        self._handler = self._new_handler()
-        self._auth = auth or self._new_auth()
+        self._handler = handler or self._new_handler(**kwargs)
+        self._auth = auth or self._new_auth(**kwargs)
 
     @abc.abstractmethod
-    def _new_handler(self) -> BaseResponseHandler:
-        pass
-
-    @abc.abstractmethod
-    def _new_auth(self) -> HttpAuth:
-        pass
-
     def _new_session(self, **kwargs) -> Any:
-        kwargs = SESSION_DEFAULTS | kwargs
-        if self._is_async():
-            if not ASYNC_ENABLED:
-                raise ImportError(ASYNC_IMPORT_ERROR_MSG)
-            elif ASYNC_CACHING_ENABLED:
-                cache = kwargs.pop("cache", None) or AsyncCacheBackend(**kwargs)
-                session = AsyncCachedSession(cache=cache, **kwargs)
-            else:
-                params = inspect.signature(AsyncClientSession.__init__).parameters
-                kwargs = {k: v for k, v in kwargs.items() if k in params}
-                session = AsyncClientSession(**kwargs)
-        else:
-            if not SYNC_ENABLED:
-                raise ImportError(SYNC_IMPORT_ERROR_MSG)
-            elif SYNC_CACHING_ENABLED:
-                cache = kwargs.pop("cache", None) or CacheBackend(**kwargs)
-                session = CachedSession(backend=cache, **kwargs)
-            else:
-                session = ClientSession()
-            session.headers = kwargs["headers"]
-            session.stream = kwargs["stream"]
-        return session
+        pass
+
+    @abc.abstractmethod
+    def _new_handler(self, **kwargs) -> BaseResponseHandler:
+        pass
+
+    @abc.abstractmethod
+    def _new_auth(self, **kwargs) -> HttpAuth:
+        pass
 
     @abc.abstractmethod
     def request(
@@ -301,10 +282,6 @@ class BaseHttpClient(abc.ABC):
         params: dict[str, str] | None = None,
         **kwargs,
     ) -> Any:
-        pass
-
-    @abc.abstractmethod
-    def _is_async(self) -> bool:
         pass
 
 

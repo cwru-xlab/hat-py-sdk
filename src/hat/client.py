@@ -14,6 +14,8 @@ from keyring.credentials import Credential
 
 from . import urls
 from . import utils
+from .base import CACHE_KWD
+from .base import SESSION_DEFAULTS
 from .base import SYNC_CACHING_ENABLED
 from .base import SYNC_ENABLED
 from .base import SYNC_IMPORT_ERROR_MSG
@@ -49,6 +51,7 @@ else:
     raise ImportError(SYNC_IMPORT_ERROR_MSG)
 
 if SYNC_CACHING_ENABLED:
+    from .base import CacheBackend
     from .base import CachedSession
 
 
@@ -118,16 +121,28 @@ class ResponseHandler(BaseResponseHandler):
 class HttpClient(BaseHttpClient, Cacheable, Closeable, AbstractContextManager):
     def __init__(
         self,
-        session: ClientSession | None = None,
+        session: Any | None = None,
+        handler: BaseResponseHandler | None = None,
         auth: HttpAuth | None = None,
         **kwargs,
     ) -> None:
-        super().__init__(session, auth, **kwargs)
+        super().__init__(session, handler, auth, **kwargs)
 
-    def _new_handler(self) -> ResponseHandler:
+    def _new_session(self, **kwargs) -> ClientSession:
+        kwargs = SESSION_DEFAULTS | kwargs
+        if SYNC_CACHING_ENABLED:
+            cache = kwargs.pop(CACHE_KWD, None) or CacheBackend(**kwargs)
+            session = CachedSession(backend=cache, **kwargs)
+        else:
+            session = ClientSession()
+            session.headers = kwargs["headers"]
+            session.stream = kwargs["stream"]
+        return session
+
+    def _new_handler(self, **kwargs) -> ResponseHandler:
         return ResponseHandler()
 
-    def _new_auth(self) -> HttpAuth:
+    def _new_auth(self, **kwargs) -> HttpAuth:
         return HttpAuth()
 
     def request(
@@ -163,9 +178,6 @@ class HttpClient(BaseHttpClient, Cacheable, Closeable, AbstractContextManager):
     def clear_cache(self) -> None:
         if SYNC_CACHING_ENABLED and isinstance(self._session, CachedSession):
             return self._session.cache.clear()
-
-    def _is_async(self) -> bool:
-        return False
 
     def __enter__(self) -> HttpClient:
         self._session.__enter__()
