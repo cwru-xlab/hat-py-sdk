@@ -151,6 +151,10 @@ class BaseResponse(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def status(self) -> int:
+        pass
+
+    @abc.abstractmethod
     def raw(self) -> bytes:
         pass
 
@@ -161,6 +165,11 @@ class BaseResponse(abc.ABC):
     @abc.abstractmethod
     def raise_for_status(self) -> None:
         pass
+
+    def __repr__(self) -> str:
+        return utils.to_str(
+            self, method=self.method(), url=self.url(), status=self.status()
+        )
 
 
 class BaseResponseError(Exception, abc.ABC):
@@ -179,6 +188,11 @@ class BaseResponseError(Exception, abc.ABC):
     @abc.abstractmethod
     def status(self) -> int:
         pass
+
+    def __repr__(self) -> str:
+        return utils.to_str(
+            self, method=self.method(), url=self.url(), status=self.status()
+        )
 
 
 class BaseResponseHandler(abc.ABC):
@@ -260,6 +274,9 @@ class BaseTokenAuth(HttpAuth):
         if TOKEN_HEADER in headers:
             return self._token.set_value(headers[TOKEN_HEADER])
 
+    def __repr__(self) -> str:
+        return utils.to_str(self, credential=self._token)
+
 
 class BaseCredentialAuth(HttpAuth):
     __slots__ = "_credential"
@@ -273,6 +290,9 @@ class BaseCredentialAuth(HttpAuth):
             "username": self._credential.username,
             "password": self._credential.password,
         }
+
+    def __repr__(self) -> str:
+        return utils.to_str(self, credential=self._credential)
 
 
 class BaseHttpClient(abc.ABC):
@@ -396,7 +416,7 @@ class BaseHatClient(abc.ABC):
         self._pattern = re.compile(rf"^{namespace}/")
 
     @abc.abstractmethod
-    def _new_token_auth(self, token: BaseApiToken) -> HttpAuth:
+    def _new_token_auth(self, token: BaseApiToken) -> BaseTokenAuth:
         pass
 
     @requires_namespace

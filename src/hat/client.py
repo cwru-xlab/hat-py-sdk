@@ -70,6 +70,9 @@ class Response(BaseResponse):
     def url(self) -> str:
         return self._wrapped.url
 
+    def status(self) -> int:
+        return self._wrapped.status_code
+
     def raw(self) -> bytes:
         return self._wrapped.content
 
@@ -135,8 +138,8 @@ class HttpClient(BaseHttpClient, Cacheable, Closeable, AbstractContextManager):
             session = CachedSession(backend=cache, **kwargs)
         else:
             session = ClientSession()
-            session.headers = kwargs["headers"]
-            session.stream = kwargs["stream"]
+        session.headers = kwargs["headers"]
+        session.stream = kwargs["stream"]
         return session
 
     def _new_handler(self, **kwargs) -> ResponseHandler:

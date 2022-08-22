@@ -77,6 +77,9 @@ class AsyncResponse(BaseResponse):
     def url(self) -> str:
         return str(self._wrapped.url)
 
+    def status(self) -> int:
+        return self._wrapped.status
+
     async def raw(self) -> bytes:
         return await self._wrapped.read()
 
