@@ -123,20 +123,20 @@ class ResponseHandler(BaseResponseHandler):
 
 class Cacheable(BaseCacheable):
     def clear_cache(self) -> None:
-        pass
+        return super().clear_cache()
 
 
 class Closeable(BaseCloseable):
     def close(self) -> None:
-        pass
+        return super().close()
 
 
 class HttpAuth(BaseHttpAuth):
     def headers(self) -> dict[str, str]:
-        return {}
+        return super().headers()
 
     def on_response(self, response: BaseResponse) -> None:
-        pass
+        return super().on_response(response)
 
 
 class HttpClient(BaseHttpClient, Cacheable, Closeable, AbstractContextManager):

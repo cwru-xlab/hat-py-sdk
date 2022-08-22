@@ -219,23 +219,19 @@ class BaseResponseHandler(abc.ABC):
 
 
 class BaseCacheable(abc.ABC):
-    @abc.abstractmethod
     def clear_cache(self) -> None:
         pass
 
 
 class BaseCloseable(abc.ABC):
-    @abc.abstractmethod
     def close(self) -> None:
         pass
 
 
 class BaseHttpAuth(abc.ABC):
-    @abc.abstractmethod
     def headers(self) -> dict[str, str]:
-        pass
+        return {}
 
-    @abc.abstractmethod
     def on_response(self, response: BaseResponse) -> None:
         pass
 
@@ -270,9 +266,6 @@ class BaseCredentialAuth(BaseHttpAuth, abc.ABC):
             "username": self._credential.username,
             "password": self._credential.password,
         }
-
-    def on_response(self, response: BaseResponse) -> None:
-        pass
 
     def __repr__(self) -> str:
         return utils.to_str(self, credential=self._credential)

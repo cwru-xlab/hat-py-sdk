@@ -132,20 +132,20 @@ class AsyncResponseHandler(BaseResponseHandler):
 
 class AsyncHttpAuth(BaseHttpAuth):
     async def headers(self) -> dict[str, str]:
-        return {}
+        return super().headers()
 
     async def on_response(self, response: AsyncResponse) -> None:
-        pass
+        return super().on_response(response)
 
 
 class AsyncCacheable(BaseCacheable):
     async def clear_cache(self) -> None:
-        pass
+        return super().clear_cache()
 
 
 class AsyncCloseable(BaseCloseable):
     async def close(self) -> None:
-        pass
+        return super().close()
 
 
 class AsyncHttpClient(
