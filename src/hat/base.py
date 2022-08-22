@@ -218,59 +218,29 @@ class BaseResponseHandler(abc.ABC):
         raise wrapper from error
 
 
-class Cacheable:
-    __slots__ = ()
-
+class BaseCacheable(abc.ABC):
+    @abc.abstractmethod
     def clear_cache(self) -> None:
         pass
 
 
-class AsyncCacheable(Cacheable):
-    async def clear_cache(self) -> None:
-        return super().clear_cache()
-
-
-class Closeable:
-    __slots__ = ()
-
+class BaseCloseable(abc.ABC):
+    @abc.abstractmethod
     def close(self) -> None:
         pass
 
 
-class AsyncCloseable(Closeable):
-    async def close(self) -> None:
-        return super().close()
-
-
-class BaseHttpAuth:
-    __slots__ = ()
-
+class BaseHttpAuth(abc.ABC):
+    @abc.abstractmethod
     def headers(self) -> dict[str, str]:
-        return {}
+        pass
 
+    @abc.abstractmethod
     def on_response(self, response: BaseResponse) -> None:
         pass
 
 
-class HttpAuth(BaseHttpAuth):
-    __slots__ = ()
-
-    def headers(self) -> dict[str, str]:
-        return super().headers()
-
-    def on_response(self, response: BaseResponse) -> None:
-        return super().on_response(response)
-
-
-class AsyncHttpAuth(BaseHttpAuth):
-    async def headers(self) -> dict[str, str]:
-        return super().headers()
-
-    async def on_response(self, response: BaseResponse) -> None:
-        return super().on_response(response)
-
-
-class BaseTokenAuth(HttpAuth):
+class BaseTokenAuth(BaseHttpAuth, abc.ABC):
     __slots__ = "_token"
 
     def __init__(self, token: BaseApiToken) -> None:
@@ -288,7 +258,7 @@ class BaseTokenAuth(HttpAuth):
         return utils.to_str(self, credential=self._token)
 
 
-class BaseCredentialAuth(HttpAuth):
+class BaseCredentialAuth(BaseHttpAuth, abc.ABC):
     __slots__ = "_credential"
 
     def __init__(self, credential: Credential) -> None:
@@ -300,6 +270,9 @@ class BaseCredentialAuth(HttpAuth):
             "username": self._credential.username,
             "password": self._credential.password,
         }
+
+    def on_response(self, response: BaseResponse) -> None:
+        pass
 
     def __repr__(self) -> str:
         return utils.to_str(self, credential=self._credential)
@@ -328,7 +301,7 @@ class BaseHttpClient(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _new_auth(self, **kwargs) -> HttpAuth:
+    def _new_auth(self, **kwargs) -> BaseHttpAuth:
         pass
 
     @abc.abstractmethod

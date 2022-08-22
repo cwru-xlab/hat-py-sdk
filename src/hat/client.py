@@ -21,16 +21,16 @@ from .base import SYNC_IMPORT_ERROR_MSG
 from .base import TOKEN_KEY
 from .base import BaseActiveHatModel
 from .base import BaseApiToken
+from .base import BaseCacheable
+from .base import BaseCloseable
 from .base import BaseCredentialAuth
 from .base import BaseHatClient
+from .base import BaseHttpAuth
 from .base import BaseHttpClient
 from .base import BaseResponse
 from .base import BaseResponseError
 from .base import BaseResponseHandler
 from .base import BaseTokenAuth
-from .base import Cacheable
-from .base import Closeable
-from .base import HttpAuth
 from .base import IStringLike
 from .base import Models
 from .base import StringLike
@@ -119,6 +119,24 @@ class ResponseHandler(BaseResponseHandler):
             return HatRecord.parse(response.raw(), kwargs["mtypes"])
         else:
             return super()._success_handling_failed(response)
+
+
+class Cacheable(BaseCacheable):
+    def clear_cache(self) -> None:
+        pass
+
+
+class Closeable(BaseCloseable):
+    def close(self) -> None:
+        pass
+
+
+class HttpAuth(BaseHttpAuth):
+    def headers(self) -> dict[str, str]:
+        return {}
+
+    def on_response(self, response: BaseResponse) -> None:
+        pass
 
 
 class HttpClient(BaseHttpClient, Cacheable, Closeable, AbstractContextManager):
@@ -271,7 +289,7 @@ class WebOwnerToken(ApiToken, abc.ABC):  # TODO
     pass
 
 
-class TokenAuth(BaseTokenAuth):
+class TokenAuth(BaseTokenAuth, HttpAuth):
     def __init__(self, token: ApiToken):
         super().__init__(token)
 
@@ -282,7 +300,7 @@ class TokenAuth(BaseTokenAuth):
         return super().on_response(response)
 
 
-class CredentialAuth(BaseCredentialAuth):
+class CredentialAuth(BaseCredentialAuth, HttpAuth):
     def __init__(self, credential: Credential):
         super().__init__(credential)
 

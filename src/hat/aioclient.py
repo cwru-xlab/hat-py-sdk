@@ -24,13 +24,13 @@ from .base import CACHE_KWD
 from .base import SESSION_DEFAULTS
 from .base import TOKEN_HEADER
 from .base import TOKEN_KEY
-from .base import AsyncCacheable
-from .base import AsyncCloseable
-from .base import AsyncHttpAuth
 from .base import BaseActiveHatModel
 from .base import BaseApiToken
+from .base import BaseCacheable
+from .base import BaseCloseable
 from .base import BaseCredentialAuth
 from .base import BaseHatClient
+from .base import BaseHttpAuth
 from .base import BaseHttpClient
 from .base import BaseResponse
 from .base import BaseResponseError
@@ -128,6 +128,24 @@ class AsyncResponseHandler(BaseResponseHandler):
 
     async def on_error(self, error: AsyncResponseError, **kwargs) -> None:
         super().on_error(error, **kwargs)
+
+
+class AsyncHttpAuth(BaseHttpAuth):
+    async def headers(self) -> dict[str, str]:
+        return {}
+
+    async def on_response(self, response: AsyncResponse) -> None:
+        pass
+
+
+class AsyncCacheable(BaseCacheable):
+    async def clear_cache(self) -> None:
+        pass
+
+
+class AsyncCloseable(BaseCloseable):
+    async def close(self) -> None:
+        pass
 
 
 class AsyncHttpClient(
