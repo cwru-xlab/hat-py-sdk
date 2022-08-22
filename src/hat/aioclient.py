@@ -3,9 +3,9 @@ from __future__ import annotations
 import abc
 import asyncio
 import inspect
-import mimetypes
 from contextlib import AbstractAsyncContextManager
 from typing import Any
+from typing import Awaitable
 from typing import Callable
 from typing import ClassVar
 from typing import Iterable
@@ -30,11 +30,13 @@ from .base import AsyncCloseable
 from .base import AsyncHttpAuth
 from .base import BaseActiveHatModel
 from .base import BaseApiToken
+from .base import BaseCredentialAuth
 from .base import BaseHatClient
 from .base import BaseHttpClient
 from .base import BaseResponse
 from .base import BaseResponseError
 from .base import BaseResponseHandler
+from .base import BaseTokenAuth
 from .base import HttpAuth
 from .base import IStringLike
 from .base import Models
@@ -280,33 +282,28 @@ class AsyncWebOwnerToken(AsyncApiToken, abc.ABC):  # TODO
     pass
 
 
-class AsyncTokenAuth(AsyncHttpAuth):
-    __slots__ = "_token"
-
+class AsyncTokenAuth(BaseTokenAuth, AsyncHttpAuth):
     def __init__(self, token: AsyncApiToken):
-        self._token = token
+        super().__init__(token)
 
     async def headers(self) -> dict[str, str]:
-        return {TOKEN_HEADER: await self._token.value()}
+        headers = super().headers()
+        headers[TOKEN_HEADER] = await headers[TOKEN_HEADER]
+        return headers
 
     async def on_response(self, response: AsyncResponse) -> None:
-        headers = response.headers()
-        if TOKEN_HEADER in headers:
-            await self._token.set_value(headers[TOKEN_HEADER])
+        result = super().on_response(response)
+        if isinstance(result, Awaitable):
+            result = await result
+        return result
 
 
-class AsyncCredentialAuth(AsyncHttpAuth):
-    __slots__ = "_credential"
-
+class AsyncCredentialAuth(BaseCredentialAuth, AsyncHttpAuth):
     def __init__(self, credential: Credential):
-        self._credential = credential
+        super().__init__(credential)
 
     async def headers(self) -> dict[str, str]:
-        return {
-            "Accept": mimetypes.types_map[".json"],
-            "username": self._credential.username,
-            "password": self._credential.password,
-        }
+        return super().headers()
 
 
 class AsyncHatClient(

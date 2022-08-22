@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-import mimetypes
 from contextlib import AbstractContextManager
 from json import JSONDecodeError
 from typing import Any
@@ -19,15 +18,16 @@ from .base import SESSION_DEFAULTS
 from .base import SYNC_CACHING_ENABLED
 from .base import SYNC_ENABLED
 from .base import SYNC_IMPORT_ERROR_MSG
-from .base import TOKEN_HEADER
 from .base import TOKEN_KEY
 from .base import BaseActiveHatModel
 from .base import BaseApiToken
+from .base import BaseCredentialAuth
 from .base import BaseHatClient
 from .base import BaseHttpClient
 from .base import BaseResponse
 from .base import BaseResponseError
 from .base import BaseResponseHandler
+from .base import BaseTokenAuth
 from .base import Cacheable
 from .base import Closeable
 from .base import HttpAuth
@@ -269,33 +269,23 @@ class WebOwnerToken(ApiToken, abc.ABC):  # TODO
     pass
 
 
-class TokenAuth(HttpAuth):
-    __slots__ = "_token"
-
+class TokenAuth(BaseTokenAuth):
     def __init__(self, token: ApiToken):
-        self._token = token
+        super().__init__(token)
 
     def headers(self) -> dict[str, str]:
-        return {TOKEN_HEADER: self._token.value()}
+        return super().headers()
 
     def on_response(self, response: Response) -> None:
-        headers = response.headers()
-        if TOKEN_HEADER in headers:
-            return self._token.set_value(headers[TOKEN_HEADER])
+        return super().on_response(response)
 
 
-class CredentialAuth(HttpAuth):
-    __slots__ = "_credential"
-
+class CredentialAuth(BaseCredentialAuth):
     def __init__(self, credential: Credential):
-        self._credential = credential
+        super().__init__(credential)
 
     def headers(self) -> dict[str, str]:
-        return {
-            "Accept": mimetypes.types_map[".json"],
-            "username": self._credential.username,
-            "password": self._credential.password,
-        }
+        return super().headers()
 
 
 class HatClient(BaseHatClient, Cacheable, Closeable, AbstractContextManager):

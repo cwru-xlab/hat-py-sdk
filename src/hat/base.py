@@ -17,6 +17,8 @@ from typing import Iterator
 from typing import TypeVar
 from typing import Union
 
+from keyring.credentials import Credential
+
 from . import errors
 from . import urls
 from . import utils
@@ -242,6 +244,35 @@ class AsyncHttpAuth(HttpAuth):
 
     async def on_response(self, response: BaseResponse) -> None:
         return super().on_response(response)
+
+
+class BaseTokenAuth(HttpAuth):
+    __slots__ = "_token"
+
+    def __init__(self, token: BaseApiToken) -> None:
+        self._token = token
+
+    def headers(self) -> dict[str, str | Awaitable[str]]:
+        return {TOKEN_HEADER: self._token.value()}
+
+    def on_response(self, response: BaseResponse) -> None | Awaitable:
+        headers = response.headers()
+        if TOKEN_HEADER in headers:
+            return self._token.set_value(headers[TOKEN_HEADER])
+
+
+class BaseCredentialAuth(HttpAuth):
+    __slots__ = "_credential"
+
+    def __init__(self, credential: Credential) -> None:
+        self._credential = credential
+
+    def headers(self) -> dict[str, str]:
+        return {
+            "Accept": mimetypes.types_map[".json"],
+            "username": self._credential.username,
+            "password": self._credential.password,
+        }
 
 
 class BaseHttpClient(abc.ABC):
