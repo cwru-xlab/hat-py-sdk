@@ -96,12 +96,11 @@ class HatRecord(BaseApiModel, BaseHatModel, GenericModel, Generic[M]):
     @classmethod
     def to_json(cls, models: Iterable[M], data_only: bool = False) -> str:
         records = map(cls._from_model, models)
-        dump = cls.__config__.json_dumps
         if data_only:
             records = [r.data for r in records]
         else:
             records = [r.dict() for r in records]
-        return dump(records)
+        return cls.__config__.json_dumps(records)
 
     @classmethod
     def _from_model(cls, model: M) -> "HatRecord[M]":
