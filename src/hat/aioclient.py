@@ -223,10 +223,9 @@ class AsyncApiToken(BaseApiToken, abc.ABC):
         return self._value
 
     async def set_value(self, value: str) -> None:
-        if self._value != value:
-            self._value = value
-            self._decoded = await self.decode(verify=True)
-            self._expires = self._compute_expiration()
+        self._value = value
+        self._decoded = await self.decode(verify=True)
+        self._expires = self._compute_expiration()
 
     async def domain(self) -> str:
         if self._domain is None:

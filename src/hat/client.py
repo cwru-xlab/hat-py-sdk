@@ -209,10 +209,9 @@ class ApiToken(BaseApiToken, abc.ABC):
         return self._value
 
     def set_value(self, value: str) -> None:
-        if self._value != value:
-            self._value = value
-            self._decoded = self.decode(verify=True)
-            self._expires = self._compute_expiration()
+        self._value = value
+        self._decoded = self.decode(verify=True)
+        self._expires = self._compute_expiration()
 
     def domain(self) -> str:
         if self._domain is None:
