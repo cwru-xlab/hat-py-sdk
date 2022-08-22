@@ -242,7 +242,7 @@ class AsyncCloseable(Closeable):
         return super().close()
 
 
-class HttpAuth:
+class BaseHttpAuth:
     __slots__ = ()
 
     def headers(self) -> dict[str, str]:
@@ -252,7 +252,17 @@ class HttpAuth:
         pass
 
 
-class AsyncHttpAuth(HttpAuth):
+class HttpAuth(BaseHttpAuth):
+    __slots__ = ()
+
+    def headers(self) -> dict[str, str]:
+        return super().headers()
+
+    def on_response(self, response: BaseResponse) -> None:
+        return super().on_response(response)
+
+
+class AsyncHttpAuth(BaseHttpAuth):
     async def headers(self) -> dict[str, str]:
         return super().headers()
 
@@ -302,7 +312,7 @@ class BaseHttpClient(abc.ABC):
         self,
         session: Any | None = None,
         handler: BaseResponseHandler | None = None,
-        auth: HttpAuth | None = None,
+        auth: BaseHttpAuth | None = None,
         **kwargs,
     ) -> None:
         self._session = session or self._new_session(**kwargs)
@@ -327,7 +337,7 @@ class BaseHttpClient(abc.ABC):
         method: str,
         url: str,
         *,
-        auth: HttpAuth | None = None,
+        auth: BaseHttpAuth | None = None,
         headers: dict[str, str] | None = None,
         data: Any = None,
         params: dict[str, str] | None = None,
@@ -350,7 +360,7 @@ class BaseApiToken(abc.ABC):
     )
 
     def __init__(
-        self, http_client: BaseHttpClient, auth: HttpAuth, jwt_type: type[JwtToken]
+        self, http_client: BaseHttpClient, auth: BaseHttpAuth, jwt_type: type[JwtToken]
     ) -> None:
         self._http = http_client
         self._auth = auth
